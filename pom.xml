@@ -19,7 +19,7 @@
     <modules>
         <module>booking-service</module>
         <module>hotel-service</module>
-        <module>api-getway</module>
+        <module>api-gateway</module>
         <module>discovery-service</module>
     </modules>
 
