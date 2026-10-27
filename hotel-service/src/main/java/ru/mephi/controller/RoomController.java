@@ -2,15 +2,13 @@ package ru.mephi.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import ru.mephi.dto.CreateRoomRequest;
 import ru.mephi.dto.RoomResponse;
 import ru.mephi.service.RoomService;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -28,6 +26,11 @@ public class RoomController {
 
         return ResponseEntity.created(URI.create("/api/rooms/" + res.getId()))
             .body(res);
+    }
+
+    @GetMapping
+    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId) {
+        return roomService.getAvailableRooms(hotelId);
     }
 
 

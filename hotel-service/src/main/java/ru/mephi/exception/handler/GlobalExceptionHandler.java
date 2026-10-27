@@ -1,5 +1,6 @@
 package ru.mephi.exception.handler;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -70,7 +71,20 @@ public class GlobalExceptionHandler {
                 "error", "Conflict",
                 "message", ex.getMessage(),
                 "hotelId", ex.getHotelId(),
-                "roomNumber", ex.getRoomNumber()
+                "roomNumber", ex.getRoomNumber(),
+                "source", "precheck"   // ← полезно для отладки/метрик
+            ));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", 409,
+                "error", "Conflict",
+                "message", "Room with this number already exists in this hotel",
+                "source", "database"   // ← видно, что сработал UNIQUE, а не предпроверка
             ));
     }
 

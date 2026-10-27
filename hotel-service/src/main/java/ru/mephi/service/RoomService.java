@@ -11,6 +11,9 @@ import ru.mephi.model.Room;
 import ru.mephi.repository.HotelRepository;
 import ru.mephi.repository.RoomRepository;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 public class RoomService {
     private final RoomRepository roomRepository;
@@ -23,15 +26,17 @@ public class RoomService {
 
     @Transactional
     public RoomResponse create(CreateRoomRequest req) {
+        String normalizedRoomNumber = req.getRoomNumber().trim();
+
         Hotel hotel = hotelRepository.findById(req.getHotelId()).orElseThrow(() -> new HotelNotFoundException(req.getHotelId()));
 
-        if(roomRepository.existsByHotelIdAndRoomNumber(req.getHotelId(), req.getRoomNumber())) {
-            throw new RoomAlreadyExistsException(req.getHotelId(), req.getRoomNumber());
+        if(roomRepository.existsByHotel_IdAndRoomNumber(req.getHotelId(), normalizedRoomNumber)) {
+            throw new RoomAlreadyExistsException(req.getHotelId(), normalizedRoomNumber);
         }
 
         Room room = new Room();
         room.setHotel(hotel);
-        room.setRoomNumber(req.getRoomNumber().trim());
+        room.setRoomNumber(normalizedRoomNumber);
         room.setCapacity(req.getCapacity());
         room.setPrice(req.getPrice());
 
@@ -40,13 +45,31 @@ public class RoomService {
 
         Room saved = roomRepository.save(room);
 
-        return new RoomResponse(saved.getId(),
-            saved.getHotel().getId(),
-            saved.getRoomNumber(),
-            saved.getCapacity(),
-            saved.getPrice(),
-            saved.getAvailable(),
-            saved.getTimesBooked());
+        return mapToResponse(saved);
+    }
 
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getAvailableRooms(Long hotelId) {
+        List<Room> rooms;
+
+        if (hotelId != null) {
+            rooms = roomRepository.findByHotel_IdAndAvailableTrue(hotelId);
+        } else {
+            rooms = roomRepository.findByAvailableTrue();
+        }
+
+        return rooms.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    private RoomResponse mapToResponse(Room room) {
+        return new RoomResponse(
+            room.getId(),
+            room.getHotel().getId(),
+            room.getRoomNumber(),
+            room.getCapacity(),
+            room.getPrice(),
+            room.getAvailable(),
+            room.getTimesBooked()
+        );
     }
 }

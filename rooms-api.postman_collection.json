@@ -1,0 +1,186 @@
+{
+    "info": {
+        "name": "Room Service API",
+        "description": "Тесты для создания номеров и обработки конфликтов уникальности",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080",
+            "type": "string"
+        },
+        {
+            "key": "hotelId",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "roomId",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "01. POST /api/rooms — успешное создание (201)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 201 Created', function () {",
+                            "    pm.response.to.have.status(201);",
+                            "});",
+                            "",
+                            "pm.test('Заголовок Location присутствует', function () {",
+                            "    pm.response.to.have.header('Location');",
+                            "    pm.expect(pm.response.headers.get('Location')).to.match(/^\\/api\\/rooms\\/\\d+$/);",
+                            "});",
+                            "",
+                            "pm.test('Дефолтные значения available=true и timesBooked=0', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body.available).to.eql(true);",
+                            "    pm.expect(body.timesBooked).to.eql(0);",
+                            "});",
+                            "",
+                            "// Сохраняем ID созданного номера",
+                            "const body = pm.response.json();",
+                            "pm.collectionVariables.set('roomId', body.id);"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"hotelId\": {{hotelId}},\n  \"roomNumber\": \"101\",\n  \"capacity\": 2,\n  \"price\": 4500.00\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"]
+                }
+            }
+        },
+        {
+            "name": "02. POST /api/rooms — дубликат номера (409 Precheck)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 409 Conflict', function () {",
+                            "    pm.response.to.have.status(409);",
+                            "});",
+                            "",
+                            "pm.test('Сработала предпроверка (source: precheck)', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body.status).to.eql(409);",
+                            "    pm.expect(body.source).to.eql('precheck');",
+                            "    pm.expect(body.message).to.include('already exists');",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"hotelId\": {{hotelId}},\n  \"roomNumber\": \"101\",\n  \"capacity\": 2,\n  \"price\": 4500.00\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"]
+                }
+            }
+        },
+        {
+            "name": "03. POST /api/rooms — отель не существует (404)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 404 Not Found', function () {",
+                            "    pm.response.to.have.status(404);",
+                            "});",
+                            "",
+                            "pm.test('Тело содержит status=404 и упоминание отеля', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body.status).to.eql(404);",
+                            "    pm.expect(body.message).to.include('Hotel');",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"hotelId\": 999999,\n  \"roomNumber\": \"102\",\n  \"capacity\": 2,\n  \"price\": 4500.00\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"]
+                }
+            }
+        },
+        {
+            "name": "04. POST /api/rooms — невалидные данные (400)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 400 Bad Request', function () {",
+                            "    pm.response.to.have.status(400);",
+                            "});",
+                            "",
+                            "pm.test('Валидация отловила пустой номер и отрицательную цену', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body.status).to.eql(400);",
+                            "    pm.expect(body.fields).to.have.property('roomNumber');",
+                            "    pm.expect(body.fields).to.have.property('price');",
+                            "    pm.expect(body.fields).to.have.property('capacity');",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"hotelId\": {{hotelId}},\n  \"roomNumber\": \"   \",\n  \"capacity\": -1,\n  \"price\": -100.00\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"]
+                }
+            }
+        }
+    ]
+}
