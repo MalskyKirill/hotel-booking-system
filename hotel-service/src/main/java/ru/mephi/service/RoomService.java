@@ -61,6 +61,21 @@ public class RoomService {
         return rooms.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getRecommendedRooms(Long hotelId) {
+        List<Room> rooms;
+
+        if (hotelId != null) {
+            rooms = roomRepository.findByHotel_IdAndAvailableTrueOrderByTimesBookedAscIdAsc(hotelId);
+        } else {
+            rooms = roomRepository.findByAvailableTrueOrderByTimesBookedAscIdAsc();
+        }
+
+        return rooms.stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
     private RoomResponse mapToResponse(Room room) {
         return new RoomResponse(
             room.getId(),

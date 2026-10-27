@@ -181,6 +181,239 @@
                     "path": ["api", "rooms"]
                 }
             }
+        },
+        {
+            "name": "05. GET /api/rooms — все доступные (200)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 200 OK', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Тело является массивом', function () {",
+                            "    pm.expect(pm.response.json()).to.be.an('array');",
+                            "});",
+                            "",
+                            "pm.test('Все возвращенные номера доступны (available=true)', function () {",
+                            "    const rooms = pm.response.json();",
+                            "    rooms.forEach(function (room) {",
+                            "        pm.expect(room.available).to.eql(true);",
+                            "    });",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"]
+                }
+            }
+        },
+        {
+            "name": "06. GET /api/rooms?hotelId={{hotelId}} — по отелю (200)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 200 OK', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Возвращены только номера запрошенного отеля', function () {",
+                            "    const rooms = pm.response.json();",
+                            "    const expectedHotelId = parseInt(pm.collectionVariables.get('hotelId'));",
+                            "    if (rooms.length > 0) {",
+                            "        rooms.forEach(function (room) {",
+                            "            pm.expect(room.hotelId).to.eql(expectedHotelId);",
+                            "            pm.expect(room.available).to.eql(true);",
+                            "        });",
+                            "    }",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms?hotelId={{hotelId}}",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"],
+                    "query": [
+                        {
+                            "key": "hotelId",
+                            "value": "{{hotelId}}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "07. GET /api/rooms?hotelId=999999 — несуществующий отель (200)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 200 OK (это не ошибка 404)', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Тело — пустой массив []', function () {",
+                            "    const rooms = pm.response.json();",
+                            "    pm.expect(rooms).to.be.an('array');",
+                            "    pm.expect(rooms.length).to.eql(0);",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms?hotelId=999999",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms"],
+                    "query": [
+                        {
+                            "key": "hotelId",
+                            "value": "999999"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "08. GET /api/rooms/recommend — рекомендации (200)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 200 OK', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "const rooms = pm.response.json();",
+                            "",
+                            "pm.test('Тело является массивом', function () {",
+                            "    pm.expect(rooms).to.be.an('array');",
+                            "});",
+                            "",
+                            "pm.test('Все номера операционно доступны (available=true)', function () {",
+                            "    rooms.forEach(function (room) {",
+                            "        pm.expect(room.available).to.eql(true);",
+                            "    });",
+                            "});",
+                            "",
+                            "pm.test('Сортировка: timesBooked ASC, затем id ASC', function () {",
+                            "    // Проверяем порядок только если в массиве больше 1 элемента",
+                            "    if (rooms.length > 1) {",
+                            "        for (let i = 0; i < rooms.length - 1; i++) {",
+                            "            const current = rooms[i];",
+                            "            const next = rooms[i + 1];",
+                            "",
+                            "            // 1. Текущий timesBooked должен быть <= следующего",
+                            "            pm.expect(current.timesBooked).to.be.at.most(next.timesBooked);",
+                            "",
+                            "            // 2. Если timesBooked равны, то текущий id должен быть < следующего",
+                            "            if (current.timesBooked === next.timesBooked) {",
+                            "                pm.expect(current.id).to.be.below(next.id);",
+                            "            }",
+                            "        }",
+                            "    }",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms/recommend",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms", "recommend"]
+                }
+            }
+        },
+        {
+            "name": "09. GET /api/rooms/recommend?hotelId={{hotelId}} — по отелю (200)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 200 OK', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "const rooms = pm.response.json();",
+                            "",
+                            "pm.test('Тело является массивом', function () {",
+                            "    pm.expect(rooms).to.be.an('array');",
+                            "});",
+                            "",
+                            "pm.test('Все номера принадлежат запрошенному отелю', function () {",
+                            "    const expectedHotelId = parseInt(pm.collectionVariables.get('hotelId'));",
+                            "    rooms.forEach(function (room) {",
+                            "        pm.expect(room.hotelId).to.eql(expectedHotelId);",
+                            "    });",
+                            "});",
+                            "",
+                            "pm.test('Все номера доступны (available=true)', function () {",
+                            "    rooms.forEach(function (room) {",
+                            "        pm.expect(room.available).to.eql(true);",
+                            "    });",
+                            "});",
+                            "",
+                            "pm.test('Сортировка: timesBooked ASC, затем id ASC', function () {",
+                            "    if (rooms.length > 1) {",
+                            "        for (let i = 0; i < rooms.length - 1; i++) {",
+                            "            const current = rooms[i];",
+                            "            const next = rooms[i + 1];",
+                            "            pm.expect(current.timesBooked).to.be.at.most(next.timesBooked);",
+                            "            if (current.timesBooked === next.timesBooked) {",
+                            "                pm.expect(current.id).to.be.below(next.id);",
+                            "            }",
+                            "        }",
+                            "    }",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/rooms/recommend?hotelId={{hotelId}}",
+                    "host": ["{{baseUrl}}"],
+                    "path": ["api", "rooms", "recommend"],
+                    "query": [
+                        {
+                            "key": "hotelId",
+                            "value": "{{hotelId}}"
+                        }
+                    ]
+                }
+            }
         }
     ]
 }

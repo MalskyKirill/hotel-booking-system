@@ -33,5 +33,10 @@ public class RoomController {
         return roomService.getAvailableRooms(hotelId);
     }
 
+    @GetMapping("/recommend")
+    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId) {
+        return roomService.getRecommendedRooms(hotelId);
+    }
+
 
 }
