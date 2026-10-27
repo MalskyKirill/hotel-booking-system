@@ -6,7 +6,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.mephi.exception.HotelHasRoomException;
 import ru.mephi.exception.HotelNotFoundException;
+import ru.mephi.exception.RoomAlreadyExistsException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -45,7 +47,32 @@ public class GlobalExceptionHandler {
                 "message", "Validation failed",
                 "fields", fieldErrors
             ));
-
-
     }
+
+    @ExceptionHandler(HotelHasRoomException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(HotelHasRoomException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", 409,
+                "error", "Conflict",
+                "message", ex.getMessage(),
+                "id", ex.getId()
+            ));
+    }
+
+    @ExceptionHandler(RoomAlreadyExistsException.class)
+    public ResponseEntity<Map<String, Object>> handleRoomAlreadyExists(RoomAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", 409,
+                "error", "Conflict",
+                "message", ex.getMessage(),
+                "hotelId", ex.getHotelId(),
+                "roomNumber", ex.getRoomNumber()
+            ));
+    }
+
+
 }

@@ -2,11 +2,14 @@ package ru.mephi.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.mephi.dto.CreateHotelRequest;
 import ru.mephi.dto.HotelResponse;
+import ru.mephi.exception.HotelHasRoomException;
 import ru.mephi.exception.HotelNotFoundException;
 import ru.mephi.model.Hotel;
 import ru.mephi.repository.HotelRepository;
+import ru.mephi.repository.RoomRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +19,12 @@ import java.util.Optional;
 public class HotelService {
 
     private final HotelRepository hotelRepository;
+    private final RoomRepository roomRepository;
 
     @Autowired
-    public HotelService(HotelRepository hotelRepository) {
+    public HotelService(HotelRepository hotelRepository, RoomRepository roomRepository) {
         this.hotelRepository = hotelRepository;
+        this.roomRepository = roomRepository;
     }
 
     public HotelResponse create(CreateHotelRequest req) {
@@ -55,14 +60,24 @@ public class HotelService {
         return hotelRepository.findById(id).map(h -> new HotelResponse(h.getId(), h.getName(), h.getAddress())).orElseThrow(() -> new HotelNotFoundException(id));
     }
 
+    @Transactional
     public HotelResponse update(Long id, CreateHotelRequest req) {
         Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new HotelNotFoundException(id));
 
         hotel.setName(req.getName().trim());
         hotel.setAddress(req.getAddress().trim());
 
-        Hotel update = hotelRepository.save(hotel);
+        return new HotelResponse(hotel.getId(), hotel.getName(), hotel.getAddress());
+    }
 
-        return new HotelResponse(update.getId(), update.getName(), update.getAddress());
+    @Transactional
+    public void delete(Long hotelId) {
+        Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() -> new HotelNotFoundException(hotelId));
+
+        if (roomRepository.existsByHotelId(hotelId)) {
+            throw new HotelHasRoomException(hotelId);
+        }
+
+        hotelRepository.delete(hotel);
     }
 }

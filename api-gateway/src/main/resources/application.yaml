@@ -14,6 +14,11 @@ spring:
                           predicates:
                               - Path=/api/hotels/**
 
+                        - id: room-route
+                          uri: lb://hotel-service
+                          predicates:
+                              - Path=/api/rooms/**
+
 
 eureka:
     client:

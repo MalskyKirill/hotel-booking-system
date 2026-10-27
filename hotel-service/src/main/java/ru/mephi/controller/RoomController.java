@@ -1,0 +1,34 @@
+package ru.mephi.controller;
+
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import ru.mephi.dto.CreateRoomRequest;
+import ru.mephi.dto.RoomResponse;
+import ru.mephi.service.RoomService;
+
+import java.net.URI;
+
+@RestController
+@RequestMapping("/api/rooms")
+public class RoomController {
+
+    private final RoomService roomService;
+
+    public RoomController(RoomService roomService) {
+        this.roomService = roomService;
+    }
+
+    @PostMapping
+    public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest req) {
+        RoomResponse res = roomService.create(req);
+
+        return ResponseEntity.created(URI.create("/api/rooms/" + res.getId()))
+            .body(res);
+    }
+
+
+}

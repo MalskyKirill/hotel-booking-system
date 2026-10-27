@@ -42,4 +42,10 @@ public class HotelController {
     public HotelResponse updateById(@PathVariable Long id, @Valid @RequestBody CreateHotelRequest req) {
         return hotelService.update(id, req);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteById(@PathVariable Long id) {
+        hotelService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

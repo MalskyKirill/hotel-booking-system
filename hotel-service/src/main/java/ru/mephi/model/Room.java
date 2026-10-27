@@ -26,29 +26,11 @@ public class Room {
     @Column(name = "available", nullable = false)
     private Boolean available;
 
-    public Integer getTimesBooked() {
-        return timesBooked;
-    }
-
-    public void setTimesBooked(Integer timesBooked) {
-        this.timesBooked = timesBooked;
-    }
-
-    public Boolean getAvailable() {
-        return available;
-    }
-
-    public void setAvailable(Boolean available) {
-        this.available = available;
-    }
-
     @Column(name = "capacity", nullable = false)
     private Integer capacity;
 
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
-
-
 
     public Room() {
     }
@@ -94,5 +76,19 @@ public class Room {
         this.price = price;
     }
 
+    public Integer getTimesBooked() {
+        return timesBooked;
+    }
 
+    public void setTimesBooked(Integer timesBooked) {
+        this.timesBooked = timesBooked;
+    }
+
+    public Boolean getAvailable() {
+        return available;
+    }
+
+    public void setAvailable(Boolean available) {
+        this.available = available;
+    }
 }

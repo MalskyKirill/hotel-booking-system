@@ -53,7 +53,7 @@
                             "",
                             "// Сохраняем id созданного отеля для последующих запросов",
                             "const body = pm.response.json();",
-                            "pm.collectionVariables.set('hotelId', body.id);",
+                            "pm.collectionVariables.set('hotelId', String(body.id));",
                             "console.log('Создан отель с id =', body.id);"
                         ],
                         "type": "text/javascript"
@@ -74,8 +74,13 @@
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels"
+                    ]
                 }
             }
         },
@@ -102,15 +107,25 @@
             ],
             "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"\",\n  \"address\": \"Moscow\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels"
+                    ]
                 }
             }
         },
@@ -131,15 +146,25 @@
             ],
             "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"   \",\n  \"address\": \"Moscow\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels"
+                    ]
                 }
             }
         },
@@ -177,8 +202,13 @@
                 "header": [],
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels"
+                    ]
                 }
             }
         },
@@ -214,8 +244,14 @@
                 "header": [],
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{hotelId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{hotelId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{hotelId}}"
+                    ]
                 }
             }
         },
@@ -255,8 +291,14 @@
                 "header": [],
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{nonExistentId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{nonExistentId}}"
+                    ]
                 }
             }
         },
@@ -280,8 +322,14 @@
                 "header": [],
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/abc",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "abc"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "abc"
+                    ]
                 }
             }
         },
@@ -313,15 +361,26 @@
             ],
             "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"Grand Hotel Premium\",\n  \"address\": \"Saint Petersburg\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{hotelId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{hotelId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{hotelId}}"
+                    ]
                 }
             }
         },
@@ -354,15 +413,26 @@
             ],
             "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"Ghost Hotel\",\n  \"address\": \"Nowhere\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{nonExistentId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{nonExistentId}}"
+                    ]
                 }
             }
         },
@@ -390,15 +460,26 @@
             ],
             "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"\",\n  \"address\": \"Moscow\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{hotelId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{hotelId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{hotelId}}"
+                    ]
                 }
             }
         },
@@ -423,15 +504,26 @@
             ],
             "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"\",\n  \"address\": \"\"\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels", "{{nonExistentId}}"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{nonExistentId}}"
+                    ]
                 }
             }
         },
@@ -452,16 +544,86 @@
             ],
             "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
                 "body": {
                     "mode": "raw",
                     "raw": "{\n  \"name\": \"Hilton\",\n  \"address\":\n}"
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/hotels",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "hotels"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels"
+                    ]
                 }
+            }
+        },
+        {
+            "name": "13. DELETE /api/hotels/{id} — успех (204)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 204 No Content', () => pm.response.to.have.status(204));",
+                            "pm.test('Тело ответа пустое', () => pm.expect(pm.response.text()).to.be.empty);"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": { "raw": "{{baseUrl}}/api/hotels/{{hotelId}}", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "{{hotelId}}"] }
+            }
+        },
+        {
+            "name": "14. DELETE /api/hotels/{id} — не найден (404)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 404 Not Found', () => pm.response.to.have.status(404));",
+                            "pm.test('Тело содержит status=404', function () {",
+                            "    const body = pm.response.json();",
+                            "    pm.expect(body).to.have.property('status', 404);",
+                            "    pm.expect(body.message).to.include('not found');",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": { "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "{{nonExistentId}}"] }
+            }
+        },
+        {
+            "name": "15. DELETE /api/hotels/{id} — некорректный ID (400)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test('Статус 400 Bad Request', () => pm.response.to.have.status(400));"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": { "raw": "{{baseUrl}}/api/hotels/abc", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "abc"] }
             }
         }
     ]
