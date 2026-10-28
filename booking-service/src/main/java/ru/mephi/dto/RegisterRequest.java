@@ -10,4 +10,10 @@ public record RegisterRequest(
     @NotBlank(message = "Password must not be blank")
     @Size(min = 8, message = "Password must be at least 8 characters long")
     String password
-) {}
+) {
+    public RegisterRequest {
+        if (username != null) {
+            username = username.trim();
+        }
+    }
+}
