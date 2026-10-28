@@ -8,7 +8,6 @@ public class Hotel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @Column(name = "hotel_name", nullable = false)
     private String name;
 
