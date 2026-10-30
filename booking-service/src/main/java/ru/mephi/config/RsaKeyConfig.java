@@ -36,7 +36,7 @@ public class RsaKeyConfig {
         String key = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
             .replace("-----BEGIN PUBLIC KEY-----", "")
             .replace("-----END PUBLIC KEY-----", "")
-            .replaceAll("\\s", "");
+            .replaceAll("\\s+", "");
         byte[] decoded = Base64.getDecoder().decode(key);
         return (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(decoded));
     }
@@ -45,7 +45,7 @@ public class RsaKeyConfig {
         String key = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
             .replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
-            .replaceAll("\\s", "");
+            .replaceAll("\\s+", "");
         byte[] decoded = Base64.getDecoder().decode(key);
         return (RSAPrivateKey) KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(decoded));
     }
