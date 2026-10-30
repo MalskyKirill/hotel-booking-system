@@ -26,6 +26,5 @@ public class AuthController {
         UserResponse res = authService.register(request);
 
         return ResponseEntity.created(URI.create("/api/users/" + res.id())).body(res);
-
     }
 }

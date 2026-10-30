@@ -38,3 +38,5 @@ build/
 ### Mac OS ###
 .DS_Store
 .idea/
+keys/private.pem
+**/keys/private.pem
