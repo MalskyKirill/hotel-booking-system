@@ -9,15 +9,26 @@ spring:
             server:
                 webmvc:
                     routes:
-                        - id: hotel-route
-                          uri: lb://hotel-service
-                          predicates:
-                              - Path=/api/hotels/**
+                        -   id: hotel-route
+                            uri: lb://hotel-service
+                            predicates:
+                                - Path=/api/hotels/**
 
-                        - id: room-route
-                          uri: lb://hotel-service
-                          predicates:
-                              - Path=/api/rooms/**
+                        -   id: room-route
+                            uri: lb://hotel-service
+                            predicates:
+                                - Path=/api/rooms/**
+
+                        -   id: auth-route
+                            uri: lb://booking-service
+                            predicates:
+                                - Path=/api/auth/**
+
+                        -   id: booking-route
+                            uri: lb://booking-service
+                            predicates:
+                                - Path=/api/bookings/**
+
 
 
 eureka:
