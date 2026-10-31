@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
+@Table(indexes = @Index(name = "idx_booking_saga_due", columnList = "status,saga_next_attempt_at,id"))
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

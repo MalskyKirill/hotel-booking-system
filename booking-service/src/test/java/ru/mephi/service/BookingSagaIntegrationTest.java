@@ -30,10 +30,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(showSql = false, properties = "booking.saga.remote.initial-delay-ms=0")
-@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class})
+@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class, BookingSagaRecovery.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingSagaIntegrationTest {
     @Autowired private BookingService service;
+    @Autowired private BookingSagaRecovery recovery;
+    @Autowired private BookingSagaTransactions sagaState;
+    @Autowired private BookingCreationTransactions transactions;
     @Autowired private BookingPendingService pendingService;
     @Autowired private BookingRepository bookings;
     @Autowired private UserRepository users;
@@ -196,6 +199,46 @@ class BookingSagaIntegrationTest {
             ? ReservationStatus.HELD : ReservationStatus.CONFIRMED)).when(hotel).getStatus(any());
         doThrow(new ru.mephi.exception.RemoteBusinessConflictException("already confirmed")).when(hotel).release(any());
         assertEquals(BookingStatus.CONFIRMED, service.create(request, "alice").status());
+    }
+
+    @Test
+    void workerCompletesDueBookingWithoutRepeatedUserRequest() {
+        BookingResponse pending = pendingService.create(request, "alice");
+        makeDue(pending.id());
+        recovery.recoverDue();
+        assertEquals(BookingStatus.CONFIRMED, bookings.findById(pending.id()).orElseThrow().getStatus());
+        recovery.recoverDue();
+        verify(hotel, times(1)).reserve(any());
+    }
+
+    @Test
+    void newCoordinatorResumesPersistedCompensationWithoutReservingAgain() {
+        BookingResponse pending = pendingService.create(request, "alice");
+        sagaState.beginCompensation(pending.id());
+        makeDue(pending.id());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.HELD)).when(hotel).getStatus(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).release(any());
+        var restarted = new BookingSagaCoordinator(sagaState, transactions, hotel, new HotelCallRetry(3, 0));
+        new BookingSagaRecovery(sagaState, restarted, 20).recoverDue();
+        assertEquals(BookingStatus.CANCELLED, bookings.findById(pending.id()).orElseThrow().getStatus());
+        verify(hotel, never()).reserve(any());
+    }
+
+    @Test
+    void workerSkipsNotDueAndTerminalBookings() {
+        BookingResponse pending = pendingService.create(request, "alice");
+        recovery.recoverDue();
+        verifyNoInteractions(hotel);
+        transactions.confirm(pending.id());
+        makeDue(pending.id());
+        recovery.recoverDue();
+        verifyNoInteractions(hotel);
+    }
+
+    private void makeDue(Long id) {
+        var booking = bookings.findById(id).orElseThrow();
+        booking.setSagaNextAttemptAt(java.time.Instant.EPOCH);
+        bookings.save(booking);
     }
 
     private void assertCommittedOutsideTransaction(CreateReservationRequest remote) {

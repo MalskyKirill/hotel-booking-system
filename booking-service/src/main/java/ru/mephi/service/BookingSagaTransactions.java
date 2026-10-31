@@ -9,6 +9,8 @@ import ru.mephi.model.Booking;
 import ru.mephi.model.BookingStatus;
 import ru.mephi.repository.BookingRepository;
 import java.time.Instant;
+import java.util.List;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class BookingSagaTransactions {
@@ -21,6 +23,11 @@ public class BookingSagaTransactions {
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
     public BookingSagaSnapshot read(Long id) {
         return snapshot(bookings.findById(id).orElseThrow());
+    }
+
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+    public List<Long> due(Instant now, int limit) {
+        return bookings.findSagaDueIds(BookingStatus.PENDING, now, PageRequest.of(0, limit));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
