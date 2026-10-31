@@ -4,6 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import java.util.Set;
+import java.util.EnumSet;
+import java.util.function.Supplier;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -28,38 +31,50 @@ public class HotelReservationClient {
     }
 
     public ReservationResponse reserve(CreateReservationRequest request) {
+        return invoke(request, () -> restClient.post().uri("/internal/reservations")
+            .body(request).retrieve().body(ReservationResponse.class),
+            Set.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+    }
+
+    public ReservationResponse confirm(CreateReservationRequest request) {
+        return invoke(request, () -> restClient.post()
+            .uri("/internal/reservations/{bookingId}/confirm", request.bookingId())
+            .retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.CONFIRMED));
+    }
+
+    public ReservationResponse release(CreateReservationRequest request) {
+        return invoke(request, () -> restClient.post()
+            .uri("/internal/reservations/{bookingId}/release", request.bookingId())
+            .body(request).retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.RELEASED));
+    }
+
+    public ReservationResponse getStatus(CreateReservationRequest request) {
+        return invoke(request, () -> restClient.get()
+            .uri("/internal/reservations/{bookingId}", request.bookingId())
+            .retrieve().body(ReservationResponse.class), EnumSet.allOf(ReservationStatus.class));
+    }
+
+    private ReservationResponse invoke(CreateReservationRequest request,
+                                       Supplier<ReservationResponse> action,
+                                       Set<ReservationStatus> expectedStatuses) {
         ReservationResponse response;
         try {
-            response = restClient.post()
-                .uri("/internal/reservations")
-                .body(request)
-                .retrieve()
-                .body(ReservationResponse.class);
+            response = action.get();
         } catch (HttpClientErrorException.Conflict ex) {
-            log.warn("Remote business conflict for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
+            log.warn("Remote business conflict for bookingId={}", request.bookingId());
             throw new RemoteBusinessConflictException(ex.getMessage());
         } catch (HttpClientErrorException.NotFound ex) {
-            log.warn("Room not found in hotel service: roomId={}", request.roomId());
             throw new RemoteRoomNotFoundException(request.roomId());
-        } catch (HttpServerErrorException ex) {
-            log.error("Hotel service 5xx for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
-            throw new RemoteServiceUncertainException(
-                "Hotel service failed with " + ex.getStatusCode(), ex);
-        } catch (ResourceAccessException ex) {
-            log.error("Timeout/network for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
-            throw new RemoteServiceUncertainException(
-                "Hotel service unreachable: " + ex.getMessage(), ex);
+        } catch (HttpServerErrorException | ResourceAccessException ex) {
+            log.error("Hotel service result uncertain for bookingId={}", request.bookingId());
+            throw new RemoteServiceUncertainException("Hotel service result is uncertain", ex);
         }
-
-        validateReserveResponse(response, request);
+        validateResponse(response, request, expectedStatuses);
         return response;
     }
 
-    private void validateReserveResponse(ReservationResponse response,
-                                         CreateReservationRequest request) {
+    private void validateResponse(ReservationResponse response,
+                                         CreateReservationRequest request, Set<ReservationStatus> expectedStatuses) {
         //  null body
         if (response == null) {
             throw new RemoteServiceUncertainException("Hotel service returned empty body");
@@ -83,8 +98,7 @@ public class HotelReservationClient {
         }
 
         //  положительная проверка статуса (а не отрицание RELEASED)
-        if (response.status() != ReservationStatus.HELD
-            && response.status() != ReservationStatus.CONFIRMED) {
+        if (!expectedStatuses.contains(response.status())) {
             throw new RemoteServiceUncertainException(
                 "Unexpected reservation status from hotel service: " + response.status());
         }
