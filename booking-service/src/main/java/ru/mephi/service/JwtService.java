@@ -1,10 +1,7 @@
 package ru.mephi.service;
 
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 import ru.mephi.model.User;
 
@@ -20,20 +17,35 @@ public class JwtService {
         this.jwtEncoder = jwtEncoder;
     }
 
+    // Пользовательский JWT (для клиентов)
     public String generateToken(User user) {
         Instant now = Instant.now();
-
         JwtClaimsSet claims = JwtClaimsSet.builder()
             .issuer("hotel-booking-system")
             .subject(user.getUsername())
             .issuedAt(now)
             .expiresAt(now.plus(1, ChronoUnit.HOURS))
-            .claim("role", user.getRole().name()) // USER или ADMIN
+            .claim("role", user.getRole().name())
             .build();
+        return encode(claims);
+    }
 
-        JwsHeader jwsHeader = JwsHeader.with(SignatureAlgorithm.RS256).build();
+    // Служебный JWT (для межсервисного взаимодействия)
+    public String generateServiceToken() {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+            .issuer("hotel-booking-system")
+            .subject("booking-service")           // <-- кто выпустил
+            .audience(java.util.List.of("hotel-service")) // <-- для кого
+            .issuedAt(now)
+            .expiresAt(now.plus(5, ChronoUnit.MINUTES))   // <-- короткоживущий
+            .claim("role", "SERVICE")             // <-- специальное полномочие
+            .build();
+        return encode(claims);
+    }
 
-        JwtEncoderParameters parameters = JwtEncoderParameters.from(jwsHeader, claims);
-        return jwtEncoder.encode(parameters).getTokenValue();
+    private String encode(JwtClaimsSet claims) {
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 }

@@ -13,7 +13,12 @@ import java.util.Set;
 
 public class CustomJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
-    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN");
+    /**
+     * Белый список ролей.
+     * SERVICE — служебная роль для межсервисного взаимодействия.
+     * Она НЕ даёт прав на административные операции (hasRole("ADMIN") не сработает).
+     */
+    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN", "SERVICE");
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
