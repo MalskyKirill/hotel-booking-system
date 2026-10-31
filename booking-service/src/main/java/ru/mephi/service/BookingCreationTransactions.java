@@ -15,7 +15,7 @@ import ru.mephi.repository.UserRepository;
 
 import java.util.Optional;
 
-/** Отдельный bean обеспечивает завершение транзакции до обработки гонки в BookingService. */
+/** Локальные транзакции создания и подтверждения Booking, отделённые от HTTP-вызовов. */
 @Service
 public class BookingCreationTransactions {
 
