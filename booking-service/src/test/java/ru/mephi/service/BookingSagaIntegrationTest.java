@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@DataJpaTest(showSql = false)
-@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class})
+@DataJpaTest(showSql = false, properties = "booking.saga.remote.initial-delay-ms=0")
+@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingSagaIntegrationTest {
     @Autowired private BookingService service;
@@ -101,10 +101,11 @@ class BookingSagaIntegrationTest {
     @Test
     void failedAttemptStaysPendingAndRepeatedRequestContinuesSameBooking() {
         doThrow(new RemoteServiceUncertainException("Lost confirmation response")).when(hotel).confirm(any());
-        assertThrows(RemoteServiceUncertainException.class, () -> service.create(request, "alice"));
+        doThrow(new RemoteServiceUncertainException("Offline")).when(hotel).getStatus(any());
+        assertEquals(BookingStatus.PENDING, service.create(request, "alice").status());
         var pending = bookings.findByRequestId(request.requestId()).orElseThrow();
         assertEquals(BookingStatus.PENDING, pending.getStatus());
-        doAnswer(invocation -> response(invocation.getArgument(0), ReservationStatus.CONFIRMED)).when(hotel).reserve(any());
+        doAnswer(invocation -> response(invocation.getArgument(0), ReservationStatus.CONFIRMED)).when(hotel).getStatus(any());
 
         BookingResponse confirmed = service.create(request, "alice");
         assertEquals(pending.getId(), confirmed.id());
@@ -135,6 +136,66 @@ class BookingSagaIntegrationTest {
             executor.shutdownNow();
             assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
         }
+    }
+
+    @Test
+    void businessRefusalCancelsOnlyAfterReleasedMarker() {
+        doThrow(new ru.mephi.exception.RemoteBusinessConflictException("occupied")).when(hotel).reserve(any());
+        doThrow(new ru.mephi.exception.RemoteReservationNotFoundException(1L)).when(hotel).getStatus(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).release(any());
+        BookingResponse cancelled = service.create(request, "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertEquals(BookingStatus.CANCELLED, bookings.findById(cancelled.id()).orElseThrow().getStatus());
+        assertEquals(cancelled, service.create(request, "alice"));
+        verify(hotel, times(1)).reserve(any());
+        verify(hotel, times(1)).release(any());
+    }
+
+    @Test
+    void timeoutAfterHeldIsCompensatedAfterBoundedReserveAttempts() {
+        doThrow(new RemoteServiceUncertainException("lost reserve response")).when(hotel).reserve(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.HELD)).when(hotel).getStatus(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).release(any());
+        assertEquals(BookingStatus.CANCELLED, service.create(request, "alice").status());
+        verify(hotel, times(3)).reserve(any());
+        verify(hotel, times(1)).release(any());
+    }
+
+    @Test
+    void lostConfirmResponseRecoversConfirmedRemoteInsteadOfCancelling() {
+        doThrow(new RemoteServiceUncertainException("lost confirm response")).when(hotel).confirm(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.CONFIRMED)).when(hotel).getStatus(any());
+        BookingResponse confirmed = service.create(request, "alice");
+        assertEquals(BookingStatus.CONFIRMED, confirmed.status());
+        assertEquals(BookingStatus.CONFIRMED, bookings.findById(confirmed.id()).orElseThrow().getStatus());
+        verify(hotel, times(3)).confirm(any());
+        verify(hotel, never()).release(any());
+    }
+
+    @Test
+    void failedReleasePersistsCompensationAndNextRequestDoesNotReserveAgain() {
+        doThrow(new RemoteServiceUncertainException("lost reserve response")).when(hotel).reserve(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.HELD)).when(hotel).getStatus(any());
+        doThrow(new RemoteServiceUncertainException("release offline")).when(hotel).release(any());
+        BookingResponse pending = service.create(request, "alice");
+        var saved = bookings.findById(pending.id()).orElseThrow();
+        assertEquals(BookingStatus.PENDING, saved.getStatus());
+        assertTrue(saved.isSagaCompensating());
+        assertEquals(1, saved.getSagaRecoveryAttempts());
+        assertTrue(saved.getSagaNextAttemptAt().isAfter(java.time.Instant.now()));
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).getStatus(any());
+        assertEquals(BookingStatus.CANCELLED, service.create(request, "alice").status());
+        verify(hotel, times(3)).reserve(any());
+    }
+
+    @Test
+    void confirmWinningRaceWithReleaseIsReconciledAsConfirmed() {
+        doThrow(new RemoteServiceUncertainException("lost reserve response")).when(hotel).reserve(any());
+        java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(inv -> response(inv.getArgument(0), reads.incrementAndGet() == 1
+            ? ReservationStatus.HELD : ReservationStatus.CONFIRMED)).when(hotel).getStatus(any());
+        doThrow(new ru.mephi.exception.RemoteBusinessConflictException("already confirmed")).when(hotel).release(any());
+        assertEquals(BookingStatus.CONFIRMED, service.create(request, "alice").status());
     }
 
     private void assertCommittedOutsideTransaction(CreateReservationRequest remote) {

@@ -30,6 +30,20 @@ public class Booking {
     @Column(name = "request_id", nullable = false, unique = true)
     private String requestId;
 
+    @Column(nullable = false)
+    private boolean sagaCompensating;
+    @Column(nullable = false)
+    private Instant sagaNextAttemptAt = Instant.now().plusSeconds(30);
+    @Column(nullable = false)
+    private int sagaRecoveryAttempts;
+
+    public boolean isSagaCompensating() { return sagaCompensating; }
+    public void setSagaCompensating(boolean value) { sagaCompensating = value; }
+    public Instant getSagaNextAttemptAt() { return sagaNextAttemptAt; }
+    public void setSagaNextAttemptAt(Instant value) { sagaNextAttemptAt = value; }
+    public int getSagaRecoveryAttempts() { return sagaRecoveryAttempts; }
+    public void setSagaRecoveryAttempts(int value) { sagaRecoveryAttempts = value; }
+
     public String getRequestId() {
         return requestId;
     }
