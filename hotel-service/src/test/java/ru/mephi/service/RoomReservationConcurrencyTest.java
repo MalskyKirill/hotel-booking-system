@@ -22,7 +22,7 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(showSql = false)
-@Import(RoomReservationService.class)
+@Import({RoomReservationService.class, RoomReservationTransactions.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class RoomReservationConcurrencyTest {
     @Autowired private RoomReservationService service;
@@ -96,6 +96,56 @@ class RoomReservationConcurrencyTest {
         service.release(1L);
         assertEquals(ReservationStatus.RELEASED, service.release(1L).status());
         assertEquals(ReservationStatus.HELD, service.reserve(request(3L)).status());
+    }
+
+    @Test
+    void compensationBeforeReservePermanentlyReleasesOperation() {
+        CreateReservationRequest request = request(1L);
+        assertEquals(ReservationStatus.RELEASED, service.release(request).status());
+        assertEquals(ReservationStatus.RELEASED, service.reserve(request).status());
+        assertEquals(ReservationStatus.RELEASED, service.release(request).status());
+        assertThrows(InvalidReservationStateException.class, () -> service.confirm(1L));
+        assertEquals(ReservationStatus.HELD, service.reserve(request(2L)).status());
+    }
+
+    @Test
+    void reserveRacingWithCompensationAlwaysEndsReleased() throws Exception {
+        CreateReservationRequest request = request(1L);
+        List<Object> results = race(() -> service.reserve(request), () -> service.release(request));
+        for (Object result : results) {
+            assertInstanceOf(ReservationResponse.class, result);
+        }
+        assertEquals(ReservationStatus.RELEASED, service.getByBookingId(1L).status());
+        assertEquals(0, rooms.findById(roomId).orElseThrow().getTimesBooked());
+    }
+
+    @Test
+    void sameBookingForDifferentRoomsProducesIdempotencyConflict() throws Exception {
+        Room second = new Room();
+        second.setHotel(hotels.findAll().getFirst());
+        second.setRoomNumber("2");
+        second.setAvailable(true);
+        second.setCapacity(1);
+        second.setPrice(BigDecimal.TEN);
+        Long secondId = rooms.save(second).getId();
+        CreateReservationRequest first = request(1L);
+        CreateReservationRequest other = new CreateReservationRequest(1L, secondId, first.startDate(), first.endDate());
+        List<Object> results = race(() -> service.reserve(first), () -> service.reserve(other));
+        assertEquals(1, results.stream().filter(ReservationResponse.class::isInstance).count());
+        assertEquals(1, results.stream().filter(ru.mephi.exception.IdempotencyConflictException.class::isInstance).count());
+        assertEquals(1, reservations.count());
+    }
+
+    @Test
+    void compensationDoesNotReleaseConfirmedReservationOrAcceptChangedDates() {
+        CreateReservationRequest request = request(1L);
+        service.reserve(request);
+        service.confirm(1L);
+        assertThrows(InvalidReservationStateException.class, () -> service.release(request));
+        assertEquals(ReservationStatus.CONFIRMED, service.getByBookingId(1L).status());
+        CreateReservationRequest changed = new CreateReservationRequest(1L, roomId,
+            request.startDate(), request.endDate().plusDays(1));
+        assertThrows(ru.mephi.exception.IdempotencyConflictException.class, () -> service.release(changed));
     }
 
     private CreateReservationRequest request(Long bookingId) {
