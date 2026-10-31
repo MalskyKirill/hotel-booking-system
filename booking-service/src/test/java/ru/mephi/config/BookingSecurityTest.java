@@ -3,6 +3,7 @@ package ru.mephi.config;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -54,7 +55,7 @@ class BookingSecurityTest {
         when(jwtDecoder.decode("test-token")).thenReturn(jwt(role));
         when(bookingService.create(any(CreateBookingRequest.class), eq("alice")))
             .thenReturn(new BookingResponse(1L, 2L, LocalDate.of(2027, 1, 1),
-                LocalDate.of(2027, 1, 2), BookingStatus.PENDING, Instant.now()));
+                LocalDate.of(2027, 1, 2), BookingStatus.CONFIRMED, Instant.now()));
 
         mvc.perform(post("/api/bookings")
                 .header("Authorization", "Bearer test-token")
@@ -98,6 +99,21 @@ class BookingSecurityTest {
             .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(bookingService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PENDING,202", "CANCELLED,409"})
+    void exposesSagaOutcomeWithoutClaimingPrematureSuccess(BookingStatus bookingStatus, int httpStatus) throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(bookingService.create(any(CreateBookingRequest.class), eq("alice")))
+            .thenReturn(new BookingResponse(1L, 2L, LocalDate.of(2027, 1, 1),
+                LocalDate.of(2027, 1, 2), bookingStatus, Instant.now()));
+        mvc.perform(post("/api/bookings")
+                .header("Authorization", "Bearer test-token")
+                .contentType(MediaType.APPLICATION_JSON).content(REQUEST))
+            .andExpect(status().is(httpStatus))
+            .andExpect(jsonPath("$.status").value(bookingStatus.name()))
+            .andExpect(jsonPath("$.id").value(1));
     }
 
     private Jwt jwt(String role) {

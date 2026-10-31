@@ -10,6 +10,9 @@ import ru.mephi.model.BookingStatus;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
+import java.time.Instant;
+import org.springframework.data.domain.Pageable;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByRequestId(String requestId);
@@ -17,6 +20,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.id = :id")
     Optional<Booking> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT b.id FROM Booking b WHERE b.status = :status AND b.sagaNextAttemptAt <= :now ORDER BY b.id")
+    List<Long> findSagaDueIds(@Param("status") BookingStatus status, @Param("now") Instant now, Pageable pageable);
 
     @Query("SELECT COUNT(b) > 0 FROM Booking b " +
         "WHERE b.roomId = :roomId " +

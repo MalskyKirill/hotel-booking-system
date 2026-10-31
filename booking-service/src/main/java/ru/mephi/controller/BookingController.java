@@ -2,6 +2,7 @@ package ru.mephi.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +31,11 @@ public class BookingController {
         String username = jwt.getSubject();
         BookingResponse response = bookingService.create(request, username);
 
-        return ResponseEntity.ok(response);
+        HttpStatus status = switch (response.status()) {
+            case CONFIRMED -> HttpStatus.OK;
+            case PENDING -> HttpStatus.ACCEPTED;
+            case CANCELLED -> HttpStatus.CONFLICT;
+        };
+        return ResponseEntity.status(status).body(response);
     }
 }
