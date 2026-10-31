@@ -172,6 +172,14 @@ public class RoomReservationService {
         return toResponse(reservation);
     }
 
+    @Transactional(readOnly = true)
+    public ReservationResponse getByBookingId(Long bookingId) {
+        RoomReservation reservation = reservationRepository.findByBookingId(bookingId)
+            .orElseThrow(() -> new ReservationNotFoundException(bookingId));
+
+        return toResponse(reservation);
+    }
+
     private ReservationResponse toResponse(RoomReservation r) {
         return new ReservationResponse(
             r.getBookingId(),
