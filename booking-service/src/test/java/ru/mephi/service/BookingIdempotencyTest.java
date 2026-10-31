@@ -35,6 +35,8 @@ class BookingIdempotencyTest {
     @Autowired
     private BookingService service;
     @Autowired
+    private BookingCreationTransactions transactions;
+    @Autowired
     private BookingRepository bookings;
     @Autowired
     private UserRepository users;
@@ -122,6 +124,27 @@ class BookingIdempotencyTest {
 
         assertThrows(IdempotencyConflictException.class, () -> service.create(changed, "alice"));
         assertEquals(1, bookings.count());
+    }
+
+    @Test
+    void confirmationIsCommittedAndIdempotent() {
+        BookingResponse pending = service.create(request(1L), "alice");
+        BookingResponse confirmed = transactions.confirm(pending.id());
+        assertEquals(ru.mephi.model.BookingStatus.CONFIRMED, confirmed.status());
+        assertEquals(confirmed, transactions.confirm(pending.id()));
+        assertEquals(confirmed.status(), bookings.findById(pending.id()).orElseThrow().getStatus());
+        assertEquals(pending.createdAt(), confirmed.createdAt());
+    }
+
+    @Test
+    void confirmationCannotReviveCancelledBooking() {
+        BookingResponse pending = service.create(request(1L), "alice");
+        var booking = bookings.findById(pending.id()).orElseThrow();
+        booking.setStatus(ru.mephi.model.BookingStatus.CANCELLED);
+        bookings.save(booking);
+        assertThrows(IllegalStateException.class, () -> transactions.confirm(pending.id()));
+        assertEquals(ru.mephi.model.BookingStatus.CANCELLED,
+            bookings.findById(pending.id()).orElseThrow().getStatus());
     }
 
     private CreateBookingRequest request(Long roomId) {

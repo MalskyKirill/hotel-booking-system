@@ -59,6 +59,17 @@ public class BookingCreationTransactions {
         return findExisting(request, user);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BookingResponse confirm(Long bookingId) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+            .orElseThrow(() -> new IllegalStateException("Booking not found: " + bookingId));
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot confirm cancelled booking: " + bookingId);
+        }
+        booking.setStatus(BookingStatus.CONFIRMED);
+        return toResponse(booking);
+    }
+
     private Optional<BookingResponse> findExisting(CreateBookingRequest request, User user) {
         return bookingRepository.findByRequestId(request.requestId()).map(booking -> {
             boolean sameOperation = booking.getUser().getId().equals(user.getId())
