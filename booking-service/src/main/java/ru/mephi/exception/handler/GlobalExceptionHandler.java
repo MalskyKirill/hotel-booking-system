@@ -56,7 +56,7 @@ public class GlobalExceptionHandler {
                 "timestamp", Instant.now().toString(),
                 "status", 409,
                 "error", "Conflict",
-                "message", "Username is already taken",
+                "message", "Data integrity constraint violated",
                 "source", "database"
             ));
     }

@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.mephi.exception.HotelHasRoomException;
 import ru.mephi.exception.HotelNotFoundException;
 import ru.mephi.exception.RoomAlreadyExistsException;
+import ru.mephi.exception.RoomNotFoundException;
+import ru.mephi.exception.ReservationNotFoundException;
+import ru.mephi.exception.ReservationConflictException;
+import ru.mephi.exception.RoomUnavailableException;
+import ru.mephi.exception.IdempotencyConflictException;
+import ru.mephi.exception.InvalidReservationStateException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -18,6 +24,47 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(RoomNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleRoomNotFound(RoomNotFoundException ex) {
+        return reservationError(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", ex);
+    }
+
+    @ExceptionHandler(ReservationNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleReservationNotFound(ReservationNotFoundException ex) {
+        return reservationError(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", ex);
+    }
+
+    @ExceptionHandler(ReservationConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleReservationConflict(ReservationConflictException ex) {
+        return reservationError(HttpStatus.CONFLICT, "RESERVATION_CONFLICT", ex);
+    }
+
+    @ExceptionHandler(RoomUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleRoomUnavailable(RoomUnavailableException ex) {
+        return reservationError(HttpStatus.CONFLICT, "ROOM_UNAVAILABLE", ex);
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleReservationIdempotencyConflict(IdempotencyConflictException ex) {
+        return reservationError(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", ex);
+    }
+
+    @ExceptionHandler(InvalidReservationStateException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidReservationState(InvalidReservationStateException ex) {
+        return reservationError(HttpStatus.CONFLICT, "INVALID_RESERVATION_STATE", ex);
+    }
+
+    private ResponseEntity<Map<String, Object>> reservationError(HttpStatus status, String code,
+                                                               RuntimeException ex) {
+        return ResponseEntity.status(status).body(Map.of(
+            "timestamp", Instant.now().toString(),
+            "status", status.value(),
+            "error", status.getReasonPhrase(),
+            "code", code,
+            "message", ex.getMessage()
+        ));
+    }
 
     @ExceptionHandler(HotelNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(HotelNotFoundException ex) {

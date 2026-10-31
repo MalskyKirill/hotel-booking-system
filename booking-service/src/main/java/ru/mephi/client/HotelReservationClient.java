@@ -8,12 +8,21 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import ru.mephi.dto.CreateReservationRequest;
 import ru.mephi.dto.ReservationResponse;
 import ru.mephi.dto.ReservationStatus;
 import ru.mephi.exception.RemoteBusinessConflictException;
 import ru.mephi.exception.RemoteRoomNotFoundException;
 import ru.mephi.exception.RemoteServiceUncertainException;
+import ru.mephi.exception.RemoteHotelRequestException;
+import ru.mephi.exception.RemoteReservationNotFoundException;
+
+import java.util.Set;
+import java.util.EnumSet;
+import java.util.function.Supplier;
 
 @Component
 public class HotelReservationClient {
@@ -28,38 +37,63 @@ public class HotelReservationClient {
     }
 
     public ReservationResponse reserve(CreateReservationRequest request) {
+        return invoke("reserve", request, () -> restClient.post().uri("/internal/reservations")
+            .body(request).retrieve().body(ReservationResponse.class),
+            Set.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED));
+    }
+
+    public ReservationResponse confirm(CreateReservationRequest request) {
+        return invoke("confirm", request, () -> restClient.post()
+            .uri("/internal/reservations/{bookingId}/confirm", request.bookingId())
+            .retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.CONFIRMED));
+    }
+
+    public ReservationResponse release(CreateReservationRequest request) {
+        return invoke("release", request, () -> restClient.post()
+            .uri("/internal/reservations/{bookingId}/release", request.bookingId())
+            .body(request).retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.RELEASED));
+    }
+
+    public ReservationResponse getStatus(CreateReservationRequest request) {
+        return invoke("getStatus", request, () -> restClient.get()
+            .uri("/internal/reservations/{bookingId}", request.bookingId())
+            .retrieve().body(ReservationResponse.class), EnumSet.allOf(ReservationStatus.class));
+    }
+
+    private ReservationResponse invoke(String operation, CreateReservationRequest request,
+                                       Supplier<ReservationResponse> action,
+                                       Set<ReservationStatus> expectedStatuses) {
         ReservationResponse response;
         try {
-            response = restClient.post()
-                .uri("/internal/reservations")
-                .body(request)
-                .retrieve()
-                .body(ReservationResponse.class);
+            response = action.get();
         } catch (HttpClientErrorException.Conflict ex) {
-            log.warn("Remote business conflict for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
-            throw new RemoteBusinessConflictException(ex.getMessage());
+            log.warn("Remote business conflict for bookingId={}", request.bookingId());
+            throw new RemoteBusinessConflictException(errorCode(ex), "Hotel service rejected conflicting operation");
         } catch (HttpClientErrorException.NotFound ex) {
-            log.warn("Room not found in hotel service: roomId={}", request.roomId());
-            throw new RemoteRoomNotFoundException(request.roomId());
-        } catch (HttpServerErrorException ex) {
-            log.error("Hotel service 5xx for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
-            throw new RemoteServiceUncertainException(
-                "Hotel service failed with " + ex.getStatusCode(), ex);
-        } catch (ResourceAccessException ex) {
-            log.error("Timeout/network for bookingId={}: {}",
-                request.bookingId(), ex.getMessage());
-            throw new RemoteServiceUncertainException(
-                "Hotel service unreachable: " + ex.getMessage(), ex);
+            if ("ROOM_NOT_FOUND".equals(errorCode(ex)) || "reserve".equals(operation)) {
+                throw new RemoteRoomNotFoundException(request.roomId());
+            }
+            throw new RemoteReservationNotFoundException(request.bookingId());
+        } catch (HttpClientErrorException ex) {
+            throw new RemoteHotelRequestException(ex.getStatusCode().value(), errorCode(ex));
+        } catch (HttpServerErrorException | ResourceAccessException ex) {
+            log.error("Hotel service result uncertain for bookingId={}", request.bookingId());
+            throw new RemoteServiceUncertainException("Hotel service result is uncertain", ex);
+        } catch (RestClientException ex) {
+            throw new RemoteServiceUncertainException("Hotel service returned an unreadable response", ex);
         }
-
-        validateReserveResponse(response, request);
+        validateResponse(response, request);
+        if ("reserve".equals(operation) && response.status() == ReservationStatus.RELEASED) {
+            throw new RemoteBusinessConflictException("RESERVATION_RELEASED", "Reservation was already released");
+        }
+        if (!expectedStatuses.contains(response.status())) {
+            throw new RemoteServiceUncertainException("Unexpected reservation status: " + response.status());
+        }
         return response;
     }
 
-    private void validateReserveResponse(ReservationResponse response,
-                                         CreateReservationRequest request) {
+    private void validateResponse(ReservationResponse response,
+                                  CreateReservationRequest request) {
         //  null body
         if (response == null) {
             throw new RemoteServiceUncertainException("Hotel service returned empty body");
@@ -82,11 +116,20 @@ public class HotelReservationClient {
                 "Hotel service returned mismatched reservation data");
         }
 
-        //  положительная проверка статуса (а не отрицание RELEASED)
-        if (response.status() != ReservationStatus.HELD
-            && response.status() != ReservationStatus.CONFIRMED) {
-            throw new RemoteServiceUncertainException(
-                "Unexpected reservation status from hotel service: " + response.status());
-        }
     }
+
+    private String errorCode(RestClientResponseException ex) {
+        try {
+            RemoteError error = ex.getResponseBodyAs(RemoteError.class);
+            if (error != null && error.code() != null && !error.code().isBlank()) {
+                return error.code();
+            }
+        } catch (RuntimeException ignored) {
+            // Неизвестное тело ошибки не меняет наблюдаемый HTTP-статус.
+        }
+        return "HTTP_" + ex.getStatusCode().value();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record RemoteError(String code) { }
 }

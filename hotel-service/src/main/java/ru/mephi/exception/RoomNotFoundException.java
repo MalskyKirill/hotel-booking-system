@@ -3,7 +3,7 @@ package ru.mephi.exception;
 public class RoomNotFoundException extends RuntimeException{
     private Long id;
     public RoomNotFoundException(Long id) {
-        super("Hotel with id " + id + " not found");
+        super("Room with id " + id + " not found");
         this.id = id;
     }
 

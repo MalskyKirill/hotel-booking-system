@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.mephi.dto.CreateReservationRequest;
 import ru.mephi.dto.ReservationResponse;
 import ru.mephi.service.RoomReservationService;
+import ru.mephi.exception.IdempotencyConflictException;
 
 @RestController
 @RequestMapping("/internal/reservations")
@@ -39,11 +40,16 @@ public class RoomReservationController {
 
     /**
      * Освободить резервирование (HELD -> RELEASED).
-     * Используется для компенсации при сбое Saga.
+     * Используется для компенсации при сбое Saga. Тело содержит исходные параметры
+     * reserve: они позволяют сохранить RELEASED до прихода запоздавшего запроса.
      */
     @PostMapping("/{bookingId}/release")
-    public ResponseEntity<ReservationResponse> release(@PathVariable Long bookingId) {
-        ReservationResponse response = reservationService.release(bookingId);
+    public ResponseEntity<ReservationResponse> release(@PathVariable Long bookingId,
+                                                       @Valid @RequestBody CreateReservationRequest request) {
+        if (!bookingId.equals(request.bookingId())) {
+            throw new IdempotencyConflictException(bookingId);
+        }
+        ReservationResponse response = reservationService.release(request);
         return ResponseEntity.ok(response);
     }
 

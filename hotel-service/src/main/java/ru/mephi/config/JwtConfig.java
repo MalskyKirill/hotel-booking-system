@@ -25,7 +25,8 @@ public class JwtConfig {
     }
 
     /**
-     * Внутренний декодер: проверяет подпись, issuer, exp И aud=hotel-service.
+     * Внутренний декодер: проверяет подпись, issuer, exp,
+     * aud=hotel-service и sub=booking-service.
      * Используется ТОЛЬКО для /internal/**.
      */
     @Bean("internalJwtDecoder")
@@ -44,7 +45,17 @@ public class JwtConfig {
                     "Required audience 'hotel-service' not present", null));
         };
 
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerAndTime, audienceValidator));
+        OAuth2TokenValidator<Jwt> subjectValidator = jwt -> {
+            if ("booking-service".equals(jwt.getSubject())) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            return OAuth2TokenValidatorResult.failure(
+                new OAuth2Error("invalid_token",
+                    "Required subject 'booking-service' not present", null));
+        };
+
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+            issuerAndTime, audienceValidator, subjectValidator));
         return decoder;
     }
 }
