@@ -7,9 +7,10 @@ import ru.mephi.model.Booking;
 import ru.mephi.model.BookingStatus;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    boolean existsByRequestId(String requestId);
+    Optional<Booking> findByRequestId(String requestId);
 
     @Query("SELECT COUNT(b) > 0 FROM Booking b " +
         "WHERE b.roomId = :roomId " +

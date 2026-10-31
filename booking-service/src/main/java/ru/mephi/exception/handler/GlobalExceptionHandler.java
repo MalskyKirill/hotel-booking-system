@@ -8,6 +8,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.mephi.exception.IdempotencyConflictException;
+import ru.mephi.exception.UserNotFoundException;
 import ru.mephi.exception.UsernameAlreadyExistsException;
 
 import java.time.Instant;
@@ -67,6 +69,29 @@ public class GlobalExceptionHandler {
                 "status", 401,
                 "error", "Unauthorized",
                 "message", "Invalid credentials"
+            ));
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleIdempotencyConflict(IdempotencyConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", 409,
+                "error", "Conflict",
+                "message", ex.getMessage(),
+                "requestId", ex.getRequestId()
+            ));
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", 401,
+                "error", "Unauthorized",
+                "message", "Token refers to a user that no longer exists"
             ));
     }
 }
