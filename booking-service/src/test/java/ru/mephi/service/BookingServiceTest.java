@@ -1,57 +1,88 @@
 package ru.mephi.service;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataIntegrityViolationException;
-import ru.mephi.dto.BookingResponse;
-import ru.mephi.dto.CreateBookingRequest;
-import ru.mephi.exception.IdempotencyConflictException;
+import ru.mephi.client.HotelReservationClient;
+import ru.mephi.dto.*;
+import ru.mephi.exception.RemoteServiceUncertainException;
 import ru.mephi.model.BookingStatus;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class BookingServiceTest {
-
+    private final BookingPendingService pending = mock(BookingPendingService.class);
     private final BookingCreationTransactions transactions = mock(BookingCreationTransactions.class);
-    private final BookingService service = new BookingService(transactions);
-    private final CreateBookingRequest request = new CreateBookingRequest(1L,
-        LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 2), "same-request");
+    private final HotelReservationClient hotel = mock(HotelReservationClient.class);
+    private final BookingService service = new BookingService(pending, transactions, hotel);
+    private final CreateBookingRequest request = new CreateBookingRequest(2L,
+        LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 3), "request-1");
+    private final CreateReservationRequest reservation = new CreateReservationRequest(1L, request.roomId(),
+        request.startDate(), request.endDate());
+    private final Instant createdAt = Instant.parse("2026-10-31T00:00:00Z");
 
     @Test
-    void readsWinnerAfterCreationTransactionFails() {
-        BookingResponse winner = new BookingResponse(1L, request.roomId(), request.startDate(),
-            request.endDate(), BookingStatus.PENDING, Instant.now());
-        when(transactions.create(request, "alice"))
-            .thenThrow(new DataIntegrityViolationException("Duplicate requestId"));
-        when(transactions.findExisting(request, "alice")).thenReturn(Optional.of(winner));
+    void commitsPendingThenReservesThenConfirmsBothServices() {
+        when(pending.create(request, "alice")).thenReturn(booking(BookingStatus.PENDING));
+        when(hotel.reserve(reservation)).thenReturn(remote(ReservationStatus.HELD));
+        when(hotel.confirm(reservation)).thenReturn(remote(ReservationStatus.CONFIRMED));
+        when(transactions.confirm(1L)).thenReturn(booking(BookingStatus.CONFIRMED));
 
-        assertEquals(winner, service.create(request, "alice"));
-        var order = inOrder(transactions);
-        order.verify(transactions).create(request, "alice");
-        order.verify(transactions).findExisting(request, "alice");
+        assertEquals(booking(BookingStatus.CONFIRMED), service.create(request, "alice"));
+
+        var order = inOrder(pending, hotel, transactions);
+        order.verify(pending).create(request, "alice");
+        order.verify(hotel).reserve(reservation);
+        order.verify(hotel).confirm(reservation);
+        order.verify(transactions).confirm(1L);
+        verifyNoMoreInteractions(hotel);
     }
 
     @Test
-    void doesNotHideConstraintFailureWithoutExistingBooking() {
-        DataIntegrityViolationException failure = new DataIntegrityViolationException("Other constraint");
-        when(transactions.create(request, "alice")).thenThrow(failure);
-        when(transactions.findExisting(request, "alice")).thenReturn(Optional.empty());
+    void resumesPendingWhenHotelAlreadyConfirmed() {
+        when(pending.create(request, "alice")).thenReturn(booking(BookingStatus.PENDING));
+        when(hotel.reserve(reservation)).thenReturn(remote(ReservationStatus.CONFIRMED));
+        when(transactions.confirm(1L)).thenReturn(booking(BookingStatus.CONFIRMED));
 
-        assertSame(failure, assertThrows(DataIntegrityViolationException.class,
-            () -> service.create(request, "alice")));
+        assertEquals(BookingStatus.CONFIRMED, service.create(request, "alice").status());
+        verify(hotel, never()).confirm(any());
+        verify(transactions).confirm(1L);
     }
 
     @Test
-    void conflictingPayloadAfterRaceRemainsConflict() {
-        when(transactions.create(request, "alice"))
-            .thenThrow(new DataIntegrityViolationException("Duplicate requestId"));
-        when(transactions.findExisting(request, "alice"))
-            .thenThrow(new IdempotencyConflictException(request.requestId()));
+    void confirmedRepeatDoesNotCallHotel() {
+        when(pending.create(request, "alice")).thenReturn(booking(BookingStatus.CONFIRMED));
 
-        assertThrows(IdempotencyConflictException.class, () -> service.create(request, "alice"));
+        assertEquals(booking(BookingStatus.CONFIRMED), service.create(request, "alice"));
+        verifyNoInteractions(hotel, transactions);
+    }
+
+    @Test
+    void cancelledRepeatDoesNotRestartSaga() {
+        when(pending.create(request, "alice")).thenReturn(booking(BookingStatus.CANCELLED));
+
+        assertEquals(BookingStatus.CANCELLED, service.create(request, "alice").status());
+        verifyNoInteractions(hotel, transactions);
+    }
+
+    @Test
+    void uncertainConfirmationDoesNotMarkBookingConfirmed() {
+        when(pending.create(request, "alice")).thenReturn(booking(BookingStatus.PENDING));
+        when(hotel.reserve(reservation)).thenReturn(remote(ReservationStatus.HELD));
+        when(hotel.confirm(reservation)).thenThrow(new RemoteServiceUncertainException("Lost response"));
+
+        assertThrows(RemoteServiceUncertainException.class, () -> service.create(request, "alice"));
+        verifyNoInteractions(transactions);
+        verify(hotel, never()).release(any());
+    }
+
+    private BookingResponse booking(BookingStatus status) {
+        return new BookingResponse(1L, request.roomId(), request.startDate(), request.endDate(), status, createdAt);
+    }
+
+    private ReservationResponse remote(ReservationStatus status) {
+        return new ReservationResponse(1L, request.roomId(), request.startDate(), request.endDate(), status);
     }
 }

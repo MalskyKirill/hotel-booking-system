@@ -28,12 +28,12 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(showSql = false)
-@Import({BookingService.class, BookingCreationTransactions.class})
+@Import({BookingPendingService.class, BookingCreationTransactions.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingIdempotencyTest {
 
     @Autowired
-    private BookingService service;
+    private BookingPendingService service;
     @Autowired
     private BookingCreationTransactions transactions;
     @Autowired
