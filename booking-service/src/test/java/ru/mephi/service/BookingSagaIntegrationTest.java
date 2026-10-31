@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +37,7 @@ class BookingSagaIntegrationTest {
     @Autowired private BookingService service;
     @Autowired private BookingSagaRecovery recovery;
     @Autowired private BookingSagaTransactions sagaState;
-    @Autowired private BookingCreationTransactions transactions;
+    @MockitoSpyBean private BookingCreationTransactions transactions;
     @Autowired private BookingPendingService pendingService;
     @Autowired private BookingRepository bookings;
     @Autowired private UserRepository users;
@@ -233,6 +234,33 @@ class BookingSagaIntegrationTest {
         makeDue(pending.id());
         recovery.recoverDue();
         verifyNoInteractions(hotel);
+    }
+
+    @Test
+    void workerRepairsLocalCommitFailureAfterHotelConfirmed() {
+        doThrow(new org.springframework.dao.TransientDataAccessResourceException("temporary DB failure"))
+            .doCallRealMethod().when(transactions).confirm(anyLong());
+        BookingResponse pending = service.create(request, "alice");
+        assertEquals(BookingStatus.PENDING, pending.status());
+        assertFalse(bookings.findById(pending.id()).orElseThrow().isSagaCompensating());
+        makeDue(pending.id());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.CONFIRMED)).when(hotel).reserve(any());
+        recovery.recoverDue();
+        assertEquals(BookingStatus.CONFIRMED, bookings.findById(pending.id()).orElseThrow().getStatus());
+        verify(hotel, times(1)).confirm(any());
+        verify(hotel, never()).release(any());
+    }
+
+    @Test
+    void recoverySelectsOnlyConfiguredBatchInStableOrder() {
+        for (int i = 0; i < 3; i++) {
+            BookingResponse pending = pendingService.create(new CreateBookingRequest(request.roomId(),
+                request.startDate(), request.endDate(), "batch-" + i), "alice");
+            makeDue(pending.id());
+        }
+        var selected = sagaState.due(java.time.Instant.now(), 2);
+        assertEquals(2, selected.size());
+        assertTrue(selected.getFirst() < selected.getLast());
     }
 
     private void makeDue(Long id) {

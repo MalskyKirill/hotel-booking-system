@@ -47,7 +47,7 @@ public class BookingSagaCoordinator {
                 log.warn("Begin compensation: bookingId={}, requestId={}", id, snapshot.requestId());
                 return compensate(request);
             }
-            return transactions.confirm(id);
+            return confirmed(id);
         } catch (RemoteServiceUncertainException | RemoteHotelRequestException
                  | RemoteBusinessConflictException | RemoteReservationNotFoundException | DataAccessException ex) {
             log.warn("Defer Saga: bookingId={}, requestId={}, cause={}", id, snapshot.requestId(), ex.getClass().getSimpleName());
@@ -55,27 +55,38 @@ public class BookingSagaCoordinator {
         }
     }
 
+    private BookingResponse confirmed(Long id) {
+        BookingResponse result = transactions.confirm(id);
+        log.info("Saga settled: bookingId={}, status={}", id, result.status());
+        return result;
+    }
+
+    private BookingResponse cancelled(Long id) {
+        BookingResponse result = state.cancel(id);
+        log.info("Saga settled: bookingId={}, status={}", id, result.status());
+        return result;
+    }
+
     private BookingResponse compensate(CreateReservationRequest request) {
         Long id = request.bookingId();
         try {
             ReservationResponse remote = retry.execute(id, "getStatus", () -> hotel.getStatus(request));
-            if (remote.status() == ReservationStatus.CONFIRMED) return transactions.confirm(id);
-            if (remote.status() == ReservationStatus.RELEASED) return state.cancel(id);
+            if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
+            if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
         } catch (RemoteReservationNotFoundException ignored) {
             // Отсутствие записи не исключает запоздавший reserve: нужен RELEASED-маркер.
         }
         try {
             retry.execute(id, "release", () -> hotel.release(request));
-            log.info("Compensation complete: bookingId={}", id);
-            return state.cancel(id);
+            return cancelled(id);
         } catch (RemoteRoomNotFoundException ignored) {
             // Несуществующий номер не может иметь резерв (FK в Hotel).
-            return state.cancel(id);
+            return cancelled(id);
         } catch (RemoteBusinessConflictException ex) {
             // confirm мог выиграть гонку с release. Уточняем результат, не отменяем вслепую.
             ReservationResponse remote = retry.execute(id, "getStatus", () -> hotel.getStatus(request));
-            if (remote.status() == ReservationStatus.CONFIRMED) return transactions.confirm(id);
-            if (remote.status() == ReservationStatus.RELEASED) return state.cancel(id);
+            if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
+            if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
             throw ex;
         }
     }

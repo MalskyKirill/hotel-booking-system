@@ -27,3 +27,14 @@ eureka:
 rsa:
     public-key: classpath:keys/public.pem
     private-key: classpath:keys/private.pem
+
+booking:
+    saga:
+        remote:
+            max-attempts: 3
+            initial-delay-ms: 100
+        recovery:
+            enabled: true
+            interval-ms: 5000
+            initial-delay-ms: 30000
+            batch-size: 20
