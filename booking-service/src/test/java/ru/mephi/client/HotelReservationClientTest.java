@@ -1,6 +1,14 @@
 package ru.mephi.client;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
+import ru.mephi.exception.*;
+import java.util.stream.Stream;
+import java.net.SocketTimeoutException;
+import java.net.ConnectException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.HttpMethod;
@@ -13,9 +21,9 @@ import ru.mephi.dto.ReservationStatus;
 
 import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class HotelReservationClientTest {
     private MockRestServiceServer server;
@@ -52,6 +60,93 @@ class HotelReservationClientTest {
         server.verify();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"RESERVATION_CONFLICT", "IDEMPOTENCY_CONFLICT", "INVALID_RESERVATION_STATE"})
+    void preservesBusinessConflictCode(String code) {
+        server.expect(requestTo(url("reserve"))).andRespond(withStatus(HttpStatus.CONFLICT)
+            .contentType(MediaType.APPLICATION_JSON).body("{\"code\":\"" + code + "\",\"message\":\"conflict\"}"));
+        RemoteBusinessConflictException error = assertThrows(RemoteBusinessConflictException.class,
+            () -> client.reserve(request));
+        assertEquals(code, error.getCode());
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 401, 403, 429})
+    void distinguishesRejectedRequestFromUncertainOutcome(int status) {
+        server.expect(requestTo(url("reserve"))).andRespond(withStatus(HttpStatus.valueOf(status)));
+        RemoteHotelRequestException error = assertThrows(RemoteHotelRequestException.class,
+            () -> client.reserve(request));
+        assertEquals(status, error.getStatus());
+        server.verify();
+    }
+
+    @Test
+    void reserve404MeansRoomNotFound() {
+        server.expect(requestTo(url("reserve"))).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThrows(RemoteRoomNotFoundException.class, () -> client.reserve(request));
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "release", "status"})
+    void operation404MeansReservationNotFound(String operation) {
+        server.expect(requestTo(url(operation))).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThrows(RemoteReservationNotFoundException.class, () -> invoke(operation));
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {500, 503})
+    void serverFailureHasUncertainOutcome(int status) {
+        server.expect(requestTo(url("reserve"))).andRespond(withStatus(HttpStatus.valueOf(status)));
+        assertThrows(RemoteServiceUncertainException.class, () -> client.reserve(request));
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void networkFailureHasUncertainOutcome(boolean timeout) {
+        server.expect(requestTo(url("reserve"))).andRespond(withException(timeout
+            ? new SocketTimeoutException("Read timed out") : new ConnectException("Connection refused")));
+        assertThrows(RemoteServiceUncertainException.class, () -> client.reserve(request));
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidResponses")
+    void malformedOrMismatchedResponseHasUncertainOutcome(String body) {
+        server.expect(requestTo(url("reserve"))).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        assertThrows(RemoteServiceUncertainException.class, () -> client.reserve(request));
+        server.verify();
+    }
+
+    static Stream<String> invalidResponses() {
+        String valid = response("HELD");
+        return Stream.of("", "{}", "{", response("UNKNOWN"),
+            valid.replace("\"bookingId\":1", "\"bookingId\":9"),
+            valid.replace("\"roomId\":2", "\"roomId\":9"),
+            valid.replace("2027-01-01", "2027-01-02"),
+            valid.replace("2027-01-03", "2027-01-04"),
+            valid.replace("\"HELD\"", "null"));
+    }
+
+    @Test
+    void releasedReservationIsTerminalBusinessConflict() {
+        server.expect(requestTo(url("reserve"))).andRespond(withSuccess(response("RELEASED"), MediaType.APPLICATION_JSON));
+        assertEquals("RESERVATION_RELEASED", assertThrows(RemoteBusinessConflictException.class,
+            () -> client.reserve(request)).getCode());
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"confirm,HELD", "confirm,RELEASED", "release,CONFIRMED", "release,HELD"})
+    void unexpectedOperationStateIsNotSuccess(String operation, String status) {
+        server.expect(requestTo(url(operation))).andRespond(withSuccess(response(status), MediaType.APPLICATION_JSON));
+        assertThrows(RemoteServiceUncertainException.class, () -> invoke(operation));
+        server.verify();
+    }
+
     private ReservationResponse invoke(String operation) {
         return switch (operation) {
             case "reserve" -> client.reserve(request);
@@ -70,7 +165,7 @@ class HotelReservationClientTest {
         };
     }
 
-    private String response(String status) {
+    private static String response(String status) {
         return """
             {"bookingId":1,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-03","status":"%s"}
             """.formatted(status);

@@ -1,6 +1,7 @@
 package ru.mephi.exception.handler;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -22,6 +23,8 @@ import java.util.stream.Stream;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,6 +58,37 @@ class ReservationExceptionHandlerTest {
             .andExpect(jsonPath("$.code").value(expectedCode))
             .andExpect(jsonPath("$.message").value(exception.getMessage()))
             .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    void compensationPassesOriginalReservationParameters() throws Exception {
+        mvc.perform(post("/internal/reservations/1/release")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"bookingId":1,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-02"}
+                    """))
+            .andExpect(status().isOk());
+        verify(service).release(new CreateReservationRequest(1L, 2L,
+            java.time.LocalDate.of(2027, 1, 1), java.time.LocalDate.of(2027, 1, 2)));
+    }
+
+    @Test
+    void compensationRejectsDifferentBookingId() throws Exception {
+        mvc.perform(post("/internal/reservations/1/release")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"bookingId":9,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-02"}
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void compensationRequiresOriginalParameters() throws Exception {
+        mvc.perform(post("/internal/reservations/1/release"))
+            .andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
     }
 
     static Stream<Arguments> reservationErrors() {
