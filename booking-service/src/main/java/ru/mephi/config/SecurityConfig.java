@@ -20,7 +20,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
-                .anyRequest().authenticated() // Все будущие /api/bookings требуют токен
+                .requestMatchers("/api/bookings", "/api/bookings/**").hasAnyRole("USER", "ADMIN")
+                .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(new CustomJwtAuthenticationConverter()))
