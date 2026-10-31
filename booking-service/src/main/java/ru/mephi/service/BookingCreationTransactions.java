@@ -15,7 +15,7 @@ import ru.mephi.repository.UserRepository;
 
 import java.util.Optional;
 
-/** Отдельный bean обеспечивает завершение транзакции до обработки гонки в BookingService. */
+/** Локальные транзакции создания и подтверждения Booking, отделённые от HTTP-вызовов. */
 @Service
 public class BookingCreationTransactions {
 
@@ -57,6 +57,17 @@ public class BookingCreationTransactions {
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new UserNotFoundException(username));
         return findExisting(request, user);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BookingResponse confirm(Long bookingId) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+            .orElseThrow(() -> new IllegalStateException("Booking not found: " + bookingId));
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot confirm cancelled booking: " + bookingId);
+        }
+        booking.setStatus(BookingStatus.CONFIRMED);
+        return toResponse(booking);
     }
 
     private Optional<BookingResponse> findExisting(CreateBookingRequest request, User user) {
