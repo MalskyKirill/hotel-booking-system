@@ -56,7 +56,8 @@ class BookingApiIntegrationTest {
     }
     private String user(String username) throws Exception {
         String credentials = json.writeValueAsString(Map.of("username", username, "password", "integration-password"));
-        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(credentials)).andExpect(status().isCreated());
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(credentials))
+            .andExpect(status().isCreated()).andExpect(header().doesNotExist("Location"));
         String login = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(credentials))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(login).path("accessToken").asText();
