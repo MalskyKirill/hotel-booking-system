@@ -25,6 +25,11 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ru.mephi.exception.NoAvailableRoomException.class)
+    public ResponseEntity<Map<String, Object>> handleNoAvailableRoom(ru.mephi.exception.NoAvailableRoomException ex) {
+        return reservationError(HttpStatus.CONFLICT, "NO_AVAILABLE_ROOM", ex);
+    }
+
     @ExceptionHandler(RoomNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleRoomNotFound(RoomNotFoundException ex) {
         return reservationError(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", ex);
