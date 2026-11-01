@@ -142,7 +142,7 @@ class BookingIdempotencyTest {
         var booking = bookings.findById(pending.id()).orElseThrow();
         booking.setStatus(ru.mephi.model.BookingStatus.CANCELLED);
         bookings.save(booking);
-        assertThrows(IllegalStateException.class, () -> transactions.confirm(pending.id()));
+        assertEquals(ru.mephi.model.BookingStatus.CANCELLED, transactions.confirm(pending.id()).status());
         assertEquals(ru.mephi.model.BookingStatus.CANCELLED,
             bookings.findById(pending.id()).orElseThrow().getStatus());
     }

@@ -30,13 +30,14 @@ public class BookingSagaCoordinator {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public BookingResponse resume(Long id) {
         BookingSagaSnapshot snapshot = state.read(id);
-        if (snapshot.booking().status() != BookingStatus.PENDING) return snapshot.booking();
+        if (snapshot.booking().status() != BookingStatus.PENDING && !snapshot.booking().cancellationRequested()) return snapshot.booking();
         BookingResponse booking = snapshot.booking();
         CreateReservationRequest request = new CreateReservationRequest(id, booking.roomId(), booking.startDate(), booking.endDate());
         log.info("Resume Saga: bookingId={}, requestId={}, compensating={}", id, snapshot.requestId(), snapshot.compensating());
         AutoReservationRequest auto = snapshot.autoSelect()
             ? new AutoReservationRequest(id, snapshot.hotelId(), booking.startDate(), booking.endDate()) : null;
         try {
+            if (booking.cancellationRequested()) return cancelRequested(request, auto);
             if (snapshot.compensating()) return compensate(request, auto);
             try {
                 ReservationResponse reserved = retry.execute(id, "reserve", () -> auto == null ? hotel.reserve(request) : hotel.reserveAuto(auto));
@@ -55,6 +56,25 @@ public class BookingSagaCoordinator {
                  | RemoteBusinessConflictException | RemoteReservationNotFoundException | DataAccessException ex) {
             log.warn("Defer Saga: bookingId={}, requestId={}, cause={}", id, snapshot.requestId(), ex.getClass().getSimpleName());
             return state.defer(id);
+        }
+    }
+
+    private BookingResponse cancelRequested(CreateReservationRequest request, AutoReservationRequest auto) {
+        Long id = request.bookingId();
+        try {
+            ReservationResponse released = retry.execute(id, "cancel",
+                () -> auto == null ? hotel.cancel(request) : hotel.cancelAuto(auto));
+            rememberSelection(auto, released);
+            return cancelled(id);
+        } catch (RemoteRoomNotFoundException ignored) {
+            return cancelled(id);
+        } catch (RemoteServiceUncertainException ex) {
+            // Потерянный ответ отмены: терминальным считаем только наблюдаемый RELEASED.
+            ReservationResponse remote = retry.execute(id, "getStatus",
+                () -> auto == null ? hotel.getStatus(request) : hotel.getAutoStatus(auto));
+            rememberSelection(auto, remote);
+            if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
+            throw ex;
         }
     }
 
@@ -80,7 +100,6 @@ public class BookingSagaCoordinator {
             ReservationResponse remote = retry.execute(id, "getStatus", () -> auto == null ? hotel.getStatus(request) : hotel.getAutoStatus(auto));
             rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
-            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
         } catch (RemoteReservationNotFoundException ignored) {
             // Отсутствие записи не исключает запоздавший reserve: нужен RELEASED-маркер.
@@ -98,7 +117,6 @@ public class BookingSagaCoordinator {
             ReservationResponse remote = retry.execute(id, "getStatus", () -> auto == null ? hotel.getStatus(request) : hotel.getAutoStatus(auto));
             rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
-            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
             throw ex;
         }

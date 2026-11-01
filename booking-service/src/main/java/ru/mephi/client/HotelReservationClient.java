@@ -55,6 +55,12 @@ public class HotelReservationClient {
             .body(request).retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.RELEASED));
     }
 
+    public ReservationResponse cancel(CreateReservationRequest request) {
+        return invoke("cancel", request, () -> restClient.post()
+            .uri("/internal/reservations/{bookingId}/cancel", request.bookingId())
+            .body(request).retrieve().body(ReservationResponse.class), Set.of(ReservationStatus.RELEASED));
+    }
+
     public ReservationResponse getStatus(CreateReservationRequest request) {
         return invoke("getStatus", request, () -> restClient.get()
             .uri("/internal/reservations/{bookingId}", request.bookingId())
@@ -64,6 +70,7 @@ public class HotelReservationClient {
     public ReservationResponse reserveAuto(AutoReservationRequest request) { return invokeAuto("reserve", request); }
     public ReservationResponse confirmAuto(AutoReservationRequest request) { return invokeAuto("confirm", request); }
     public ReservationResponse releaseAuto(AutoReservationRequest request) { return invokeAuto("release", request); }
+    public ReservationResponse cancelAuto(AutoReservationRequest request) { return invokeAuto("cancel", request); }
     public ReservationResponse getAutoStatus(AutoReservationRequest request) { return invokeAuto("status", request); }
 
     private ReservationResponse invokeAuto(String operation, AutoReservationRequest request) {
@@ -90,7 +97,7 @@ public class HotelReservationClient {
             throw new RemoteBusinessConflictException("RESERVATION_RELEASED", "Selection was already cancelled");
         }
         if ((operation.equals("confirm") && response.status() != ReservationStatus.CONFIRMED)
-            || (operation.equals("release") && response.status() != ReservationStatus.RELEASED)) {
+            || ((operation.equals("release") || operation.equals("cancel")) && response.status() != ReservationStatus.RELEASED)) {
             throw new RemoteServiceUncertainException("Unexpected automatic selection state");
         }
         return response;

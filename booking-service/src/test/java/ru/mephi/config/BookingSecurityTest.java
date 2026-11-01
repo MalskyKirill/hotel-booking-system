@@ -52,6 +52,9 @@ class BookingSecurityTest {
     @MockitoBean
     private ru.mephi.service.BookingQueryService queries;
 
+    @MockitoBean
+    private ru.mephi.service.BookingCancellationService cancellations;
+
     @ParameterizedTest
     @ValueSource(strings = {"USER", "ADMIN"})
     void allowsUserAndAdmin(String role) throws Exception {
@@ -165,6 +168,29 @@ class BookingSecurityTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/bookings/9")
                 .header("Authorization", "Bearer test-token"))
             .andExpect(status().isNotFound());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"CANCELLED,false,200", "CONFIRMED,true,202", "PENDING,true,202"})
+    void deleteReportsFinalOrPendingCancellation(BookingStatus bookingStatus, boolean requested, int expected) throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(cancellations.cancel(1L, "alice")).thenReturn(new BookingResponse(1L, 2L,
+            LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 2), bookingStatus, Instant.now(), requested));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/bookings/1")
+                .header("Authorization", "Bearer test-token"))
+            .andExpect(status().is(expected)).andExpect(jsonPath("$.cancellationRequested").value(requested));
+        verify(cancellations).cancel(1L, "alice");
+    }
+
+    @Test
+    void foreignCancellationIsNotFoundAndAnonymousCancellationIsUnauthorized() throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(cancellations.cancel(9L, "alice")).thenThrow(new ru.mephi.exception.BookingNotFoundException());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/bookings/9")
+                .header("Authorization", "Bearer test-token"))
+            .andExpect(status().isNotFound());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/bookings/1"))
+            .andExpect(status().isUnauthorized());
     }
 
     private Jwt jwt(String role) {

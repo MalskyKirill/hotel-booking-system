@@ -67,7 +67,7 @@ public class BookingCreationTransactions {
         Booking booking = bookingRepository.findByIdForUpdate(bookingId)
             .orElseThrow(() -> new IllegalStateException("Booking not found: " + bookingId));
         if (booking.getStatus() == BookingStatus.CANCELLED) {
-            throw new IllegalStateException("Cannot confirm cancelled booking: " + bookingId);
+            return toResponse(booking);
         }
         if (booking.isAutoSelect() && booking.getRoomId() == null) {
             throw new IllegalStateException("Automatic selection has no room: " + bookingId);
@@ -92,13 +92,6 @@ public class BookingCreationTransactions {
     }
 
     private BookingResponse toResponse(Booking b) {
-        return new BookingResponse(
-            b.getId(),
-            b.getRoomId(),
-            b.getStartDate(),
-            b.getEndDate(),
-            b.getStatus(),
-            b.getCreatedAt()
-        );
+        return BookingResponse.from(b);
     }
 }

@@ -28,7 +28,6 @@ public class BookingQueryService {
         return new BookingPage(result.map(this::map).getContent(), page, size, result.getTotalElements(), result.getTotalPages());
     }
     private BookingResponse map(Booking booking) {
-        return new BookingResponse(booking.getId(), booking.getRoomId(), booking.getStartDate(), booking.getEndDate(),
-            booking.getStatus(), booking.getCreatedAt());
+        return BookingResponse.from(booking);
     }
 }

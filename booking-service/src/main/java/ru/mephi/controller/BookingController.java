@@ -24,10 +24,13 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final BookingQueryService queries;
+    private final ru.mephi.service.BookingCancellationService cancellations;
 
-    public BookingController(BookingService bookingService, BookingQueryService queries) {
+    public BookingController(BookingService bookingService, BookingQueryService queries,
+                             ru.mephi.service.BookingCancellationService cancellations) {
         this.bookingService = bookingService;
         this.queries = queries;
+        this.cancellations = cancellations;
     }
 
     @GetMapping
@@ -42,6 +45,13 @@ public class BookingController {
         return queries.get(id, jwt.getSubject());
     }
 
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    public ResponseEntity<BookingResponse> cancel(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        BookingResponse result = cancellations.cancel(id, jwt.getSubject());
+        return ResponseEntity.status(result.status() == ru.mephi.model.BookingStatus.CANCELLED
+            ? HttpStatus.OK : HttpStatus.ACCEPTED).body(result);
+    }
+
     @PostMapping
     public ResponseEntity<BookingResponse> create(
         @Valid @RequestBody CreateBookingRequest request,
@@ -50,7 +60,7 @@ public class BookingController {
         String username = jwt.getSubject();
         BookingResponse response = bookingService.create(request, username);
 
-        HttpStatus status = switch (response.status()) {
+        HttpStatus status = response.cancellationRequested() ? HttpStatus.ACCEPTED : switch (response.status()) {
             case CONFIRMED -> HttpStatus.OK;
             case PENDING -> HttpStatus.ACCEPTED;
             case CANCELLED -> HttpStatus.CONFLICT;
