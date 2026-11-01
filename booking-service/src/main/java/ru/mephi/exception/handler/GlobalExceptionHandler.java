@@ -38,7 +38,8 @@ public class GlobalExceptionHandler {
         return error(409, "DATA_INTEGRITY_CONFLICT", "Data integrity constraint violated", request);
     }
     private ResponseEntity<ApiError> error(int status, String code, String message, HttpServletRequest request) {
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiError.of(HttpStatusCode.valueOf(status), code, message,
-            request.getRequestURI(), Map.of()));
+        var response = ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON);
+        if (status == 401) response.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        return response.body(ApiError.of(HttpStatusCode.valueOf(status), code, message, request.getRequestURI(), Map.of()));
     }
 }

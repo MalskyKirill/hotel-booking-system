@@ -1,6 +1,10 @@
 package ru.mephi.config;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.DispatcherType;
+import ru.mephi.api.ApiSecurityHandlers;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -26,15 +30,18 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain internalChain(
         HttpSecurity http,
-        @Qualifier("internalJwtDecoder") JwtDecoder internalJwtDecoder) throws Exception {
+        @Qualifier("internalJwtDecoder") JwtDecoder internalJwtDecoder, ObjectMapper mapper) throws Exception {
 
         http
             .securityMatcher("/internal/**")
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().hasRole("SERVICE"))
+            .exceptionHandling(errors -> errors.authenticationEntryPoint(ApiSecurityHandlers.unauthorized(mapper))
+                .accessDeniedHandler(ApiSecurityHandlers.forbidden(mapper)))
+            .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("SERVICE"))
             .oauth2ResourceServer(oauth2 -> oauth2
+                .authenticationEntryPoint(ApiSecurityHandlers.unauthorized(mapper))
+                .accessDeniedHandler(ApiSecurityHandlers.forbidden(mapper))
                 .jwt(jwt -> jwt
                     .decoder(internalJwtDecoder)
                     .jwtAuthenticationConverter(new CustomJwtAuthenticationConverter())
@@ -52,33 +59,33 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain publicChain(
         HttpSecurity http,
-        @Qualifier("publicJwtDecoder") JwtDecoder publicJwtDecoder) throws Exception {
+        @Qualifier("publicJwtDecoder") JwtDecoder publicJwtDecoder, ObjectMapper mapper,
+        @Value("${spring.h2.console.enabled:false}") boolean consoleEnabled,
+        @Value("${spring.h2.console.path:/h2-console}") String consolePath) throws Exception {
 
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // публичный каталог
-                .requestMatchers(HttpMethod.GET, "/api/hotels/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/rooms/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                // админские операции
-                .requestMatchers(HttpMethod.POST, "/api/hotels/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/hotels/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/hotels/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/rooms/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/rooms/**").hasRole("ADMIN")
-                // всё остальное — с валидным токеном
-                .anyRequest().authenticated()
-            )
+            .exceptionHandling(errors -> errors.authenticationEntryPoint(ApiSecurityHandlers.unauthorized(mapper))
+                .accessDeniedHandler(ApiSecurityHandlers.forbidden(mapper)))
+            .authorizeHttpRequests(auth -> {
+                auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+                if (consoleEnabled) auth.requestMatchers(consolePath, consolePath + "/**").permitAll();
+                auth.requestMatchers("/api/admin/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/hotels/**", "/api/rooms/**").hasAnyRole("USER", "ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/hotels/**", "/api/rooms/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/hotels/**", "/api/rooms/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/hotels/**", "/api/rooms/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.DELETE, "/api/hotels/**", "/api/rooms/**").hasRole("ADMIN")
+                    .anyRequest().hasAnyRole("USER", "ADMIN");
+            })
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt
-                    .decoder(publicJwtDecoder)
-                    .jwtAuthenticationConverter(new CustomJwtAuthenticationConverter())
-                ));
+                .authenticationEntryPoint(ApiSecurityHandlers.unauthorized(mapper))
+                .accessDeniedHandler(ApiSecurityHandlers.forbidden(mapper))
+                .jwt(jwt -> jwt.decoder(publicJwtDecoder)
+                    .jwtAuthenticationConverter(new CustomJwtAuthenticationConverter())));
+        if (consoleEnabled) http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
-        http.headers(h -> h.frameOptions(f -> f.sameOrigin()));
         return http.build();
     }
 }

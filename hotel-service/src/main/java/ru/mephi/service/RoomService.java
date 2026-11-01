@@ -8,6 +8,7 @@ import ru.mephi.model.ReservationStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import ru.mephi.dto.CreateRoomRequest;
 import ru.mephi.dto.RoomResponse;
@@ -32,6 +33,7 @@ public class RoomService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public RoomResponse create(CreateRoomRequest req) {
         String normalizedRoomNumber = req.getRoomNumber().trim();
 

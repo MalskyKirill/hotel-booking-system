@@ -20,7 +20,7 @@ class ApiErrorContractTest {
     MockMvc mvc;
     @BeforeEach void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new Probe(), new ApiErrorController())
-            .setControllerAdvice(new CommonApiExceptionHandler()).build();
+            .setControllerAdvice(new CommonApiExceptionHandler(), new ApiSecurityExceptionHandler()).build();
     }
     @ParameterizedTest
     @CsvSource({"/test/query,MISSING_PARAMETER", "/test/query?id=bad,INVALID_PARAMETER", "/test/conflict,CONFLICT"})
@@ -58,7 +58,13 @@ class ApiErrorContractTest {
             .andExpect(status().isConflict()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.code").value("CONFLICT"));
     }
+    @Test void methodSecurityDenialUsesSameContract() throws Exception {
+        mvc.perform(get("/test/denied")).andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+            .andExpect(jsonPath("$.path").value("/test/denied"));
+    }
     @RestController static class Probe {
+        @GetMapping("/test/denied") void denied() { throw new org.springframework.security.access.AccessDeniedException("private-input"); }
         @GetMapping("/test/query") String query(@RequestParam Long id) { return id.toString(); }
         @PostMapping("/test/body") String body(@RequestBody Map<String,Object> body) { return "ok"; }
         @GetMapping("/test/conflict") void conflict() { throw new ResponseStatusException(HttpStatus.CONFLICT, "Conflict"); }

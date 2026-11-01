@@ -2,6 +2,7 @@ package ru.mephi.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import ru.mephi.dto.CreateHotelRequest;
 import ru.mephi.dto.HotelResponse;
@@ -27,6 +28,7 @@ public class HotelService {
         this.roomRepository = roomRepository;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public HotelResponse create(CreateHotelRequest req) {
         Hotel hotel = new Hotel();
         hotel.setName(req.getName());
@@ -61,6 +63,7 @@ public class HotelService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public HotelResponse update(Long id, CreateHotelRequest req) {
         Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new HotelNotFoundException(id));
 
@@ -71,6 +74,7 @@ public class HotelService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(Long hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() -> new HotelNotFoundException(hotelId));
 
