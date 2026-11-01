@@ -1,0 +1,35 @@
+name: Проверка проекта
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: JUnit, MockMvc и системные проверки
+        run: mvn -B -ntp -Psystem-tests clean verify
+      - name: Сохранить отчёты и логи
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reports
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+            system-tests/target/stack-logs/

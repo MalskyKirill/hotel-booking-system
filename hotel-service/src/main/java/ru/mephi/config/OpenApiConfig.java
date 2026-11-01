@@ -53,4 +53,3 @@ public class OpenApiConfig {
                 new MediaType().schema(new Schema<>().$ref("#/components/schemas/ApiError")))));
     }
 }
-
