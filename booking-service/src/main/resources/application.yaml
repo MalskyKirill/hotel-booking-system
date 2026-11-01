@@ -16,8 +16,8 @@ spring:
 
     h2:
         console:
-            enabled: true
-            path: /h2console
+            enabled: false
+            path: /h2-console
 
 eureka:
     client:
