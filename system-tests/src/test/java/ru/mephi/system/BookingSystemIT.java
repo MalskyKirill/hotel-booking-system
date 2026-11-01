@@ -34,6 +34,20 @@ class BookingSystemIT {
             s.call(service, "/h2-console/", "GET", null, s.admin, 10).error(404, "NOT_FOUND", "/h2-console/");
     }
 
+    @Test void gatewayServesSwaggerUiAndBothOpenApiDocuments() throws Exception {
+        for (String service : List.of("booking", "hotel")) {
+            JsonNode spec = s.get("/v3/api-docs/" + service, null).require(200);
+            assertTrue(spec.path("openapi").asText().startsWith("3."));
+            assertEquals("bearer", spec.path("components").path("securitySchemes").path("bearerAuth").path("scheme").asText());
+            assertEquals("/", spec.path("servers").get(0).path("url").asText());
+            spec.path("paths").fieldNames().forEachRemaining(path -> assertTrue(path.startsWith("/api/")));
+        }
+        JsonNode config = s.get("/v3/api-docs/swagger-config", null).require(200);
+        assertEquals(2, config.path("urls").size());
+        assertTrue(s.get("/swagger-ui/index.html", null).require(200).asText().contains("swagger-ui"));
+        s.get("/api/bookings", null).error(401, "UNAUTHORIZED", "/api/bookings");
+    }
+
     @Test void lifecycleOwnershipAndIdempotency() throws Exception {
         var fixture = s.fixture(1);
         long room = fixture.rooms().getFirst();

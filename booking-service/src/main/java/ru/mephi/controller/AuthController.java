@@ -1,5 +1,7 @@
 package ru.mephi.controller;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +26,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @ApiResponse(responseCode = "201", description = "Ресурс создан")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse res = authService.register(request);
 

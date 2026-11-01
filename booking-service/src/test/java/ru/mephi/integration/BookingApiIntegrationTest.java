@@ -111,4 +111,30 @@ class BookingApiIntegrationTest {
         assertEquals(0, bookings.count());
         verifyNoInteractions(hotel);
     }
+
+    @Test void openApiIsPublicAndDescribesSagaResponsesAndBearerAuth() throws Exception {
+        String body = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+            .andExpect(jsonPath("$.servers[0].url").value("/"))
+            .andReturn().getResponse().getContentAsString();
+        JsonNode spec = json.readTree(body);
+        JsonNode create = spec.path("paths").path("/api/bookings").path("post");
+        assertEquals("#/components/schemas/BookingResponse", create.path("responses").path("200").path("content").path("application/json").path("schema").path("$ref").asText());
+        assertTrue(create.path("responses").has("202"));
+        assertEquals("#/components/schemas/ApiError", create.path("responses").path("409").path("content").path("application/json").path("schema").path("$ref").asText());
+        JsonNode loginSecurity = spec.path("paths").path("/api/auth/login").path("post").path("security");
+        assertTrue(loginSecurity.isArray() && loginSecurity.isEmpty());
+        assertTrue(spec.path("paths").path("/api/auth/register").path("post").path("responses").has("201"));
+        assertEquals(7, spec.path("components").path("schemas").path("ApiError").path("required").size());
+        JsonNode schemas = spec.path("components").path("schemas");
+        assertFalse(schemas.path("CreateBookingRequest").path("properties").has("dateRangeValid"));
+        for (String name : java.util.List.of("RegisterRequest", "CreateUserRequest", "UpdateUserRequest")) {
+            assertFalse(schemas.path(name).path("properties").has("passwordLengthSupported"));
+            assertTrue(schemas.path(name).path("properties").path("password").path("writeOnly").asBoolean());
+        }
+        assertFalse(schemas.path("UpdateUserRequest").path("properties").has("updatePresent"));
+        assertFalse(spec.path("paths").has("/error"));
+        mvc.perform(get("/swagger-ui.html")).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/api/bookings")).andExpect(status().isUnauthorized());
+    }
 }
