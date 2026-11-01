@@ -11,6 +11,7 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Owns four JVMs and isolated H2 databases. No connections to an existing deployment. */
@@ -123,7 +124,7 @@ final class LiveStack implements AutoCloseable {
         return message + "." + encoder.encodeToString(signer.sign());
     }
 
-    record Response(int status, JsonNode body, String contentType) {
+    record Response(int status, JsonNode body, String contentType, String traceId) {
         JsonNode require(int expected) { assertEquals(expected, status, "Unexpected HTTP status"); return body; }
         JsonNode error(int expected, String code, String path) {
             JsonNode node = require(expected);
@@ -140,16 +141,23 @@ final class LiveStack implements AutoCloseable {
     }
     Response call(String path, String method, Object data, String token) throws Exception { return call("gateway", path, method, data, token, 60); }
     Response get(String path, String token) throws Exception { return call(path, "GET", null, token); }
+    Response correlated(String path, String method, Object data, String token, String traceId) throws IOException, InterruptedException {
+        return call("gateway", path, method, data, token, 60, traceId);
+    }
     Response call(String service, String path, String method, Object data, String token, int timeout) throws IOException, InterruptedException {
+        return call(service, path, method, data, token, timeout, null);
+    }
+    private Response call(String service, String path, String method, Object data, String token, int timeout, String traceId) throws IOException, InterruptedException {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + ports.get(service) + path))
             .timeout(Duration.ofSeconds(timeout)).header("Content-Type", "application/json")
             .method(method, data == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(JSON.writeValueAsBytes(data)));
         if (token != null) request.header("Authorization", "Bearer " + token);
+        if (traceId != null) request.header("X-Correlation-Id", traceId);
         HttpResponse<byte[]> response = client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
         String contentType = response.headers().firstValue("Content-Type").orElse("");
         JsonNode body = response.body().length == 0 ? JSON.nullNode() : contentType.contains("json")
             ? JSON.readTree(response.body()) : JSON.valueToTree(new String(response.body(), StandardCharsets.UTF_8));
-        return new Response(response.statusCode(), body, contentType);
+        return new Response(response.statusCode(), body, contentType, response.headers().firstValue("X-Correlation-Id").orElse(null));
     }
     record Fixture(long hotel, List<Long> rooms) { }
     Fixture fixture(int count) throws Exception {
@@ -188,6 +196,57 @@ final class LiveStack implements AutoCloseable {
             Thread.sleep(250);
         } while (System.nanoTime() < deadline);
         throw new AssertionError("Booking " + id + " did not settle as " + expected);
+    }
+
+    JsonNode awaitEvent(String service, Predicate<JsonNode> matches) throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        do {
+            checkProcesses();
+            for (String line : Files.readAllLines(logs.resolve(service + ".log"))) {
+                if (!line.startsWith("{") || !line.endsWith("}")) continue;
+                JsonNode event = JSON.readTree(line);
+                if (matches.test(event)) return event;
+            }
+            Thread.sleep(50);
+        } while (System.nanoTime() < deadline);
+        throw new AssertionError("Expected structured event missing in " + service + "; logs: " + logs);
+    }
+
+    void assertHttpTrace(String service, String traceId, int status) throws Exception {
+        JsonNode event = awaitEvent(service, e -> e.path("traceId").asText().equals(traceId)
+            && e.path("message").asText().equals("HTTP request completed")
+            && e.path("http").path("response").path("status_code").asInt() == status);
+        assertEquals(service, event.path("service").path("name").asText());
+    }
+
+    void assertRecoveryTrace(long id, String originalTraceId) throws Exception {
+        JsonNode event = awaitEvent("booking-service", e -> e.path("message").asText().equals(
+            "Saga settled: bookingId=" + id + ", status=CANCELLED") && e.path("traceId").asText().startsWith("saga-"));
+        String trace = event.path("traceId").asText();
+        assertNotEquals(originalTraceId, trace);
+        var observations = proxy.observations(trace);
+        assertFalse(observations.isEmpty(), "Recovery made no correlated Hotel calls");
+        for (var observation : observations) assertEquals(trace, observation.upstreamTraceId());
+    }
+
+    /** Warm the circuit through public API so fault cases do not inherit each other's state. */
+    void establishHealthyCircuit() throws Exception {
+        var fixture = fixture(1);
+        long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+        int healthy = 0;
+        int day = 1;
+        while (healthy < 4 && System.nanoTime() < deadline) {
+            var request = booking(fixture, false);
+            var start = LocalDate.of(2028, 1, 1).plusDays(day++);
+            request.put("startDate", start.toString()); request.put("endDate", start.plusDays(1).toString());
+            var response = create(request);
+            if (response.status != 200) { healthy = 0; Thread.sleep(250); continue; }
+            long id = response.body.path("id").asLong();
+            var cancelled = call("/api/bookings/" + id, "DELETE", null, user);
+            if (cancelled.status == 200) healthy++;
+            else { settled(id, "CANCELLED"); healthy = 0; }
+        }
+        assertEquals(4, healthy, "Circuit did not recover before the next independent scenario");
     }
 
     @Override public void close() {
