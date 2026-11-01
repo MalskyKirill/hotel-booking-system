@@ -18,6 +18,12 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(ru.mephi.exception.BookingNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleBookingNotFound() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "timestamp", Instant.now().toString(), "status", 404,
+            "error", "Not Found", "message", "Booking not found"));
+    }
 
     @ExceptionHandler(UsernameAlreadyExistsException.class)
     public ResponseEntity<Map<String, Object>> handleUsernameExists(UsernameAlreadyExistsException ex) {

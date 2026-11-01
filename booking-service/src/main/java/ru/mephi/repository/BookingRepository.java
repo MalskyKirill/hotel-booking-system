@@ -15,6 +15,8 @@ import java.time.Instant;
 import org.springframework.data.domain.Pageable;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    Optional<Booking> findByIdAndUser_Username(Long id, String username);
+    org.springframework.data.domain.Page<Booking> findByUser_Username(String username, Pageable pageable);
     Optional<Booking> findByRequestId(String requestId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -49,6 +49,9 @@ class BookingSecurityTest {
     @MockitoBean
     private BookingService bookingService;
 
+    @MockitoBean
+    private ru.mephi.service.BookingQueryService queries;
+
     @ParameterizedTest
     @ValueSource(strings = {"USER", "ADMIN"})
     void allowsUserAndAdmin(String role) throws Exception {
@@ -143,6 +146,25 @@ class BookingSecurityTest {
                     """.formatted(selection)))
             .andExpect(status().isBadRequest());
         verifyNoInteractions(bookingService);
+    }
+
+    @Test
+    void historyUsesJwtSubjectAndDoesNotAcceptAnotherOwner() throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(queries.history("alice", 0, 20)).thenReturn(new ru.mephi.dto.BookingPage(java.util.List.of(), 0, 20, 0, 0));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/bookings")
+                .param("username", "bob").header("Authorization", "Bearer test-token"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        verify(queries).history("alice", 0, 20);
+    }
+
+    @Test
+    void missingAndForeignBookingHaveSameHttpStatus() throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(queries.get(9L, "alice")).thenThrow(new ru.mephi.exception.BookingNotFoundException());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/bookings/9")
+                .header("Authorization", "Bearer test-token"))
+            .andExpect(status().isNotFound());
     }
 
     private Jwt jwt(String role) {

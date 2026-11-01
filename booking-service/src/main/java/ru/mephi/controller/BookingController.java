@@ -12,15 +12,34 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.mephi.dto.BookingResponse;
 import ru.mephi.dto.CreateBookingRequest;
 import ru.mephi.service.BookingService;
+import ru.mephi.service.BookingQueryService;
+import ru.mephi.dto.BookingPage;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingQueryService queries;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService, BookingQueryService queries) {
         this.bookingService = bookingService;
+        this.queries = queries;
+    }
+
+    @GetMapping
+    public BookingPage history(@AuthenticationPrincipal Jwt jwt,
+                               @RequestParam(defaultValue = "0") int page,
+                               @RequestParam(defaultValue = "20") int size) {
+        return queries.history(jwt.getSubject(), page, size);
+    }
+
+    @GetMapping("/{id}")
+    public BookingResponse get(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        return queries.get(id, jwt.getSubject());
     }
 
     @PostMapping
