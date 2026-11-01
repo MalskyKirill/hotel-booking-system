@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@DataJpaTest(showSql = false, properties = "booking.saga.remote.initial-delay-ms=0")
-@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class, BookingSagaRecovery.class, BookingCancellationService.class, BookingQueryService.class})
+@DataJpaTest(showSql = false, properties = {"booking.saga.remote.initial-delay-ms=0", "booking.saga.circuit.enabled=false"})
+@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class, HotelCircuitBreaker.class, BookingSagaRecovery.class, BookingCancellationService.class, BookingQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingSagaIntegrationTest {
     @Autowired private BookingService service;

@@ -30,6 +30,13 @@ rsa:
 
 booking:
     saga:
+        circuit:
+            enabled: true
+            sliding-window-size: 10
+            minimum-number-of-calls: 5
+            failure-rate-threshold: 50
+            wait-duration-ms: 10000
+            half-open-calls: 2
         remote:
             max-attempts: 3
             initial-delay-ms: 100
