@@ -1,5 +1,8 @@
 package ru.mephi.controller;
 
+import ru.mephi.service.BookingCancellationService;
+import ru.mephi.model.BookingStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -24,10 +27,10 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final BookingQueryService queries;
-    private final ru.mephi.service.BookingCancellationService cancellations;
+    private final BookingCancellationService cancellations;
 
     public BookingController(BookingService bookingService, BookingQueryService queries,
-                             ru.mephi.service.BookingCancellationService cancellations) {
+                             BookingCancellationService cancellations) {
         this.bookingService = bookingService;
         this.queries = queries;
         this.cancellations = cancellations;
@@ -45,10 +48,10 @@ public class BookingController {
         return queries.get(id, jwt.getSubject());
     }
 
-    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<BookingResponse> cancel(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         BookingResponse result = cancellations.cancel(id, jwt.getSubject());
-        return ResponseEntity.status(result.status() == ru.mephi.model.BookingStatus.CANCELLED
+        return ResponseEntity.status(result.status() == BookingStatus.CANCELLED
             ? HttpStatus.OK : HttpStatus.ACCEPTED).body(result);
     }
 

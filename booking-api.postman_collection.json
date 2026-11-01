@@ -1,0 +1,53 @@
+{
+    "info": {
+        "name": "Booking API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080"
+        },
+        {
+            "key": "token",
+            "value": ""
+        },
+        {
+            "key": "bookingId",
+            "value": "1"
+        }
+    ],
+    "item": [
+        {
+            "name": "История своих бронирований",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/bookings?page=0&size=20"
+            }
+        },
+        {
+            "name": "Своё бронирование по ID",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+            }
+        },
+        {
+            "name": "Отменить своё бронирование",
+            "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+            }
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 package ru.mephi.service;
 
+import ru.mephi.exception.BookingNotFoundException;
 import ru.mephi.exception.RemoteServiceUncertainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -34,8 +35,8 @@ public class BookingSagaTransactions {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BookingResponse requestCancellation(Long id, String username) {
         Booking booking = bookings.findByIdForUpdate(id)
-            .orElseThrow(ru.mephi.exception.BookingNotFoundException::new);
-        if (!booking.getUser().getUsername().equals(username)) throw new ru.mephi.exception.BookingNotFoundException();
+            .orElseThrow(BookingNotFoundException::new);
+        if (!booking.getUser().getUsername().equals(username)) throw new BookingNotFoundException();
         if (booking.getStatus() != BookingStatus.CANCELLED) {
             booking.setCancellationRequested(true);
             booking.setSagaNextAttemptAt(Instant.now());

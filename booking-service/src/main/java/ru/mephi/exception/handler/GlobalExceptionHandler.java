@@ -1,5 +1,6 @@
 package ru.mephi.exception.handler;
 
+import ru.mephi.exception.BookingNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,7 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(ru.mephi.exception.BookingNotFoundException.class)
+    @ExceptionHandler(BookingNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleBookingNotFound() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
             "timestamp", Instant.now().toString(), "status", 404,

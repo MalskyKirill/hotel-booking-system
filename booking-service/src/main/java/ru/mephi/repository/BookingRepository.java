@@ -1,5 +1,6 @@
 package ru.mephi.repository;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import jakarta.persistence.LockModeType;
@@ -16,7 +17,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByIdAndUser_Username(Long id, String username);
-    org.springframework.data.domain.Page<Booking> findByUser_Username(String username, Pageable pageable);
+    Page<Booking> findByUser_Username(String username, Pageable pageable);
     Optional<Booking> findByRequestId(String requestId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -436,6 +436,21 @@ class BookingSagaIntegrationTest {
         }
     }
 
+    @Test
+    void confirmedAutomaticBookingCanBeCancelledWithoutLosingSelectedRoom() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "auto-cancel-confirmed", true, 5L);
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.HELD)).when(hotel).reserveAuto(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.CONFIRMED)).when(hotel).confirmAuto(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.RELEASED)).when(hotel).cancelAuto(any());
+        var confirmed = service.create(auto, "alice");
+        var cancelled = cancellations.cancel(confirmed.id(), "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertEquals(7L, cancelled.roomId());
+        assertFalse(cancelled.cancellationRequested());
+        verify(hotel, never()).cancel(any());
+        verify(hotel, never()).releaseAuto(any());
+    }
+
     private void makeDue(Long id) {
         var booking = bookings.findById(id).orElseThrow();
         booking.setSagaNextAttemptAt(java.time.Instant.EPOCH);
