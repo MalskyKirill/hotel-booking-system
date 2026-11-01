@@ -1,145 +1,63 @@
 package ru.mephi.exception.handler;
 
-import ru.mephi.exception.NoAvailableRoomException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.mephi.exception.HotelHasRoomException;
-import ru.mephi.exception.HotelNotFoundException;
-import ru.mephi.exception.RoomAlreadyExistsException;
-import ru.mephi.exception.RoomNotFoundException;
-import ru.mephi.exception.ReservationNotFoundException;
-import ru.mephi.exception.ReservationConflictException;
-import ru.mephi.exception.RoomUnavailableException;
-import ru.mephi.exception.IdempotencyConflictException;
-import ru.mephi.exception.InvalidReservationStateException;
-
-import java.time.Instant;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+import ru.mephi.api.ApiError;
+import ru.mephi.exception.*;
 import java.util.Map;
-import java.util.stream.Collectors;
-
 
 @RestControllerAdvice
+@Order(0)
 public class GlobalExceptionHandler {
-
     @ExceptionHandler(NoAvailableRoomException.class)
-    public ResponseEntity<Map<String, Object>> handleNoAvailableRoom(NoAvailableRoomException ex) {
-        return reservationError(HttpStatus.CONFLICT, "NO_AVAILABLE_ROOM", ex);
+    public ResponseEntity<ApiError> handleNoAvailableRoomException(NoAvailableRoomException ex, HttpServletRequest request) {
+        return error(409, "NO_AVAILABLE_ROOM", ex.getMessage(), request);
     }
-
     @ExceptionHandler(RoomNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleRoomNotFound(RoomNotFoundException ex) {
-        return reservationError(HttpStatus.NOT_FOUND, "ROOM_NOT_FOUND", ex);
+    public ResponseEntity<ApiError> handleRoomNotFoundException(RoomNotFoundException ex, HttpServletRequest request) {
+        return error(404, "ROOM_NOT_FOUND", ex.getMessage(), request);
     }
-
     @ExceptionHandler(ReservationNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleReservationNotFound(ReservationNotFoundException ex) {
-        return reservationError(HttpStatus.NOT_FOUND, "RESERVATION_NOT_FOUND", ex);
+    public ResponseEntity<ApiError> handleReservationNotFoundException(ReservationNotFoundException ex, HttpServletRequest request) {
+        return error(404, "RESERVATION_NOT_FOUND", ex.getMessage(), request);
     }
-
     @ExceptionHandler(ReservationConflictException.class)
-    public ResponseEntity<Map<String, Object>> handleReservationConflict(ReservationConflictException ex) {
-        return reservationError(HttpStatus.CONFLICT, "RESERVATION_CONFLICT", ex);
+    public ResponseEntity<ApiError> handleReservationConflictException(ReservationConflictException ex, HttpServletRequest request) {
+        return error(409, "RESERVATION_CONFLICT", ex.getMessage(), request);
     }
-
     @ExceptionHandler(RoomUnavailableException.class)
-    public ResponseEntity<Map<String, Object>> handleRoomUnavailable(RoomUnavailableException ex) {
-        return reservationError(HttpStatus.CONFLICT, "ROOM_UNAVAILABLE", ex);
+    public ResponseEntity<ApiError> handleRoomUnavailableException(RoomUnavailableException ex, HttpServletRequest request) {
+        return error(409, "ROOM_UNAVAILABLE", ex.getMessage(), request);
     }
-
     @ExceptionHandler(IdempotencyConflictException.class)
-    public ResponseEntity<Map<String, Object>> handleReservationIdempotencyConflict(IdempotencyConflictException ex) {
-        return reservationError(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", ex);
+    public ResponseEntity<ApiError> handleIdempotencyConflictException(IdempotencyConflictException ex, HttpServletRequest request) {
+        return error(409, "IDEMPOTENCY_CONFLICT", ex.getMessage(), request);
     }
-
     @ExceptionHandler(InvalidReservationStateException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidReservationState(InvalidReservationStateException ex) {
-        return reservationError(HttpStatus.CONFLICT, "INVALID_RESERVATION_STATE", ex);
+    public ResponseEntity<ApiError> handleInvalidReservationStateException(InvalidReservationStateException ex, HttpServletRequest request) {
+        return error(409, "INVALID_RESERVATION_STATE", ex.getMessage(), request);
     }
-
-    private ResponseEntity<Map<String, Object>> reservationError(HttpStatus status, String code,
-                                                               RuntimeException ex) {
-        return ResponseEntity.status(status).body(Map.of(
-            "timestamp", Instant.now().toString(),
-            "status", status.value(),
-            "error", status.getReasonPhrase(),
-            "code", code,
-            "message", ex.getMessage()
-        ));
-    }
-
     @ExceptionHandler(HotelNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(HotelNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", 404,
-                "error", "Not Found",
-                "message", ex.getMessage(),
-                "id", ex.getId()
-                ));
+    public ResponseEntity<ApiError> handleHotelNotFoundException(HotelNotFoundException ex, HttpServletRequest request) {
+        return error(404, "HOTEL_NOT_FOUND", ex.getMessage(), request);
     }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-        Map<String, String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-            .collect(Collectors.toMap(
-                FieldError::getField,
-                fe -> fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "invalid value"
-                , (a, b) -> a
-            ));
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", 400,
-                "error", "Bad request",
-                "message", "Validation failed",
-                "fields", fieldErrors
-            ));
-    }
-
     @ExceptionHandler(HotelHasRoomException.class)
-    public ResponseEntity<Map<String, Object>> handleConflict(HotelHasRoomException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", 409,
-                "error", "Conflict",
-                "message", ex.getMessage(),
-                "id", ex.getId()
-            ));
+    public ResponseEntity<ApiError> handleHotelHasRoomException(HotelHasRoomException ex, HttpServletRequest request) {
+        return error(409, "HOTEL_HAS_ROOMS", ex.getMessage(), request);
     }
-
     @ExceptionHandler(RoomAlreadyExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleRoomAlreadyExists(RoomAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", 409,
-                "error", "Conflict",
-                "message", ex.getMessage(),
-                "hotelId", ex.getHotelId(),
-                "roomNumber", ex.getRoomNumber(),
-                "source", "precheck"   // ← полезно для отладки/метрик
-            ));
+    public ResponseEntity<ApiError> handleRoomAlreadyExistsException(RoomAlreadyExistsException ex, HttpServletRequest request) {
+        return error(409, "ROOM_ALREADY_EXISTS", ex.getMessage(), request);
     }
-
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of(
-                "timestamp", Instant.now().toString(),
-                "status", 409,
-                "error", "Conflict",
-                "message", "Room with this number already exists in this hotel",
-                "source", "database"   // ← видно, что сработал UNIQUE, а не предпроверка
-            ));
+    public ResponseEntity<ApiError> integrity(HttpServletRequest request) {
+        return error(409, "DATA_INTEGRITY_CONFLICT", "Data integrity constraint violated", request);
     }
-
-
+    private ResponseEntity<ApiError> error(int status, String code, String message, HttpServletRequest request) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiError.of(HttpStatusCode.valueOf(status), code, message,
+            request.getRequestURI(), Map.of()));
+    }
 }
