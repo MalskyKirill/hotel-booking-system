@@ -19,6 +19,15 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByAvailableTrueOrderByTimesBookedAscIdAsc();
     List<Room> findByHotel_IdAndAvailableTrueOrderByTimesBookedAscIdAsc(Long hotelId);
 
+    @Query("SELECT r FROM Room r WHERE r.available = true " +
+        "AND (:hotelId IS NULL OR r.hotel.id = :hotelId) " +
+        "AND NOT EXISTS (SELECT x.id FROM RoomReservation x WHERE x.room = r " +
+        "AND x.status IN :statuses AND x.startDate < :endDate AND x.endDate > :startDate)")
+    List<Room> findFree(@Param("hotelId") Long hotelId, @Param("startDate") java.time.LocalDate startDate,
+                        @Param("endDate") java.time.LocalDate endDate,
+                        @Param("statuses") java.util.Collection<ru.mephi.model.ReservationStatus> statuses,
+                        org.springframework.data.domain.Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Room r WHERE r.id = :id")
     Optional<Room> findByIdForUpdate(@Param("id") Long id);

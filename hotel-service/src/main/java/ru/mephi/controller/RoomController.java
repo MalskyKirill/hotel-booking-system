@@ -29,13 +29,17 @@ public class RoomController {
     }
 
     @GetMapping
-    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId) {
-        return roomService.getAvailableRooms(hotelId);
+    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId,
+                                      @RequestParam java.time.LocalDate startDate,
+                                      @RequestParam java.time.LocalDate endDate) {
+        return roomService.search(hotelId, startDate, endDate, false);
     }
 
     @GetMapping("/recommend")
-    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId) {
-        return roomService.getRecommendedRooms(hotelId);
+    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId,
+                                                @RequestParam java.time.LocalDate startDate,
+                                                @RequestParam java.time.LocalDate endDate) {
+        return roomService.search(hotelId, startDate, endDate, true);
     }
 
 

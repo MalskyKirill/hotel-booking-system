@@ -76,6 +76,20 @@ public class RoomService {
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<RoomResponse> search(Long hotelId, java.time.LocalDate startDate,
+                                     java.time.LocalDate endDate, boolean recommended) {
+        if (startDate == null || endDate == null || !startDate.isBefore(endDate)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "A valid startDate/endDate interval is required");
+        }
+        var sort = recommended ? org.springframework.data.domain.Sort.by("timesBooked", "id")
+            : org.springframework.data.domain.Sort.unsorted();
+        return roomRepository.findFree(hotelId, startDate, endDate,
+            java.util.Set.of(ru.mephi.model.ReservationStatus.HELD, ru.mephi.model.ReservationStatus.CONFIRMED),
+            org.springframework.data.domain.Pageable.unpaged(sort)).stream().map(this::mapToResponse).toList();
+    }
+
     private RoomResponse mapToResponse(Room room) {
         return new RoomResponse(
             room.getId(),
