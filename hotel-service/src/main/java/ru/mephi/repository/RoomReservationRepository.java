@@ -11,6 +11,13 @@ import java.util.Collection;
 import java.util.Optional;
 
 public interface RoomReservationRepository extends JpaRepository<RoomReservation, Long> {
+    boolean existsByRoom_Id(Long roomId);
+
+    @Query("SELECT r FROM RoomReservation r WHERE r.room.id IN :ids AND r.status IN :statuses " +
+        "AND r.startDate < :endDate AND r.endDate > :startDate")
+    java.util.List<RoomReservation> findForStatistics(@Param("ids") java.util.List<Long> ids,
+        @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate,
+        @Param("statuses") Collection<ReservationStatus> statuses);
 
     Optional<RoomReservation> findByBookingId(Long bookingId);
 

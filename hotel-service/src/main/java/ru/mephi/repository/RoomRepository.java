@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RoomRepository extends JpaRepository<Room, Long> {
+    org.springframework.data.domain.Page<Room> findByHotel_Id(Long hotelId, org.springframework.data.domain.Pageable pageable);
     List<Room> findByHotel_Id(Long hotelId);
     boolean existsByHotelId(Long hotelId);
     boolean existsByHotel_IdAndRoomNumber(Long hotelId, String roomNumber);
