@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
+import ru.mephi.observability.TraceContext;
 
 @Component
 public class BookingSagaRecovery {
@@ -26,14 +27,16 @@ public class BookingSagaRecovery {
         initialDelayString = "${booking.saga.recovery.initial-delay-ms:30000}")
     public void recoverDue() {
         for (Long id : state.due(Instant.now(), batchSize)) {
-            try {
-                saga.resume(id);
-            } catch (RuntimeException ex) {
-                log.error("Saga recovery failed: bookingId={}, cause={}", id, ex.getClass().getSimpleName());
+            try (TraceContext context = TraceContext.background(id)) {
                 try {
-                    state.defer(id);
-                } catch (RuntimeException deferFailure) {
-                    log.error("Cannot defer Saga: bookingId={}, cause={}", id, deferFailure.getClass().getSimpleName());
+                    saga.resume(id);
+                } catch (RuntimeException ex) {
+                    log.error("Saga recovery failed: bookingId={}, cause={}", id, ex.getClass().getSimpleName());
+                    try {
+                        state.defer(id);
+                    } catch (RuntimeException deferFailure) {
+                        log.error("Cannot defer Saga: bookingId={}, cause={}", id, deferFailure.getClass().getSimpleName());
+                    }
                 }
             }
         }
