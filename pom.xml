@@ -17,6 +17,7 @@
 
     <packaging>pom</packaging>
     <modules>
+        <module>request-context</module>
         <module>booking-service</module>
         <module>hotel-service</module>
         <module>api-gateway</module>
