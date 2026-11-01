@@ -54,6 +54,9 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
+        if (request.password() == null || request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw new BadCredentialsException("Invalid credentials");
+        }
         // Ищем пользователя. Не нашли — то же сообщение, что и при неверном пароле
         User user = userRepository.findByUsername(request.username())
             .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
