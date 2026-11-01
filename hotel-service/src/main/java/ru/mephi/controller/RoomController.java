@@ -1,5 +1,7 @@
 package ru.mephi.controller;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+
 import java.time.LocalDate;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ public class RoomController {
     }
 
     @PostMapping
+    @ApiResponse(responseCode = "201", description = "Ресурс создан")
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest req) {
         RoomResponse res = roomService.create(req);
 

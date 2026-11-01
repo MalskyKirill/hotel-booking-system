@@ -70,6 +70,7 @@ public class SecurityConfig {
                 .accessDeniedHandler(ApiSecurityHandlers.forbidden(mapper)))
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+                auth.requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
                 if (consoleEnabled) auth.requestMatchers(consolePath, consolePath + "/**").permitAll();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/hotels/**", "/api/rooms/**").hasAnyRole("USER", "ADMIN")

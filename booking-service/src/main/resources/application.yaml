@@ -38,3 +38,11 @@ booking:
             interval-ms: 5000
             initial-delay-ms: 30000
             batch-size: 20
+
+springdoc:
+    paths-to-match: /api/**
+    override-with-generic-response: false
+    api-docs:
+        version: OPENAPI_3_0
+    swagger-ui:
+        disable-swagger-default-url: true

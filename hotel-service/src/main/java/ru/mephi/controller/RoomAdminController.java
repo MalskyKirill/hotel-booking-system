@@ -1,5 +1,8 @@
 package ru.mephi.controller;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +23,7 @@ public class RoomAdminController {
         return admin.list(hotelId, page, size);
     }
     @GetMapping("/{id}") public RoomResponse get(@PathVariable Long id) { return admin.get(id); }
+    @ApiResponse(responseCode = "201", description = "Ресурс создан")
     @PostMapping public ResponseEntity<RoomResponse> create(@Valid @RequestBody CreateRoomRequest request) {
         var result = rooms.create(request);
         return ResponseEntity.created(URI.create("/api/admin/rooms/" + result.getId())).body(result);
@@ -27,6 +31,7 @@ public class RoomAdminController {
     @PutMapping("/{id}") public RoomResponse update(@PathVariable Long id, @Valid @RequestBody UpdateRoomRequest request) {
         return admin.update(id, request);
     }
+    @ApiResponse(responseCode = "204", description = "Ресурс удалён", content = @Content)
     @DeleteMapping("/{id}") public ResponseEntity<Void> delete(@PathVariable Long id) {
         admin.delete(id); return ResponseEntity.noContent().build();
     }

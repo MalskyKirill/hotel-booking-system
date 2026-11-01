@@ -9,6 +9,20 @@ spring:
             server:
                 webmvc:
                     routes:
+                        -   id: booking-openapi
+                            uri: lb://booking-service
+                            predicates:
+                                - Path=/v3/api-docs/booking
+                            filters:
+                                - SetPath=/v3/api-docs
+
+                        -   id: hotel-openapi
+                            uri: lb://hotel-service
+                            predicates:
+                                - Path=/v3/api-docs/hotel
+                            filters:
+                                - SetPath=/v3/api-docs
+
                         -   id: admin-hotel-route
                             uri: lb://hotel-service
                             predicates:
@@ -54,3 +68,15 @@ management:
         web:
             exposure:
                 include: gateway
+
+springdoc:
+    paths-to-match: /api/**
+    api-docs:
+        version: OPENAPI_3_0
+    swagger-ui:
+        disable-swagger-default-url: true
+        urls:
+            - name: Booking Service
+              url: /v3/api-docs/booking
+            - name: Hotel Service
+              url: /v3/api-docs/hotel

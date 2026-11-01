@@ -1,5 +1,8 @@
 package ru.mephi.controller;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ public class HotelController {
     }
 
     @PostMapping
+    @ApiResponse(responseCode = "201", description = "Ресурс создан")
     public ResponseEntity<HotelResponse> create(@Valid @RequestBody CreateHotelRequest req) {
         HotelResponse res = hotelService.create(req);
 
@@ -44,6 +48,7 @@ public class HotelController {
     }
 
     @DeleteMapping("/{id}")
+    @ApiResponse(responseCode = "204", description = "Ресурс удалён", content = @Content)
     public ResponseEntity<Void> deleteById(@PathVariable Long id) {
         hotelService.delete(id);
         return ResponseEntity.noContent().build();

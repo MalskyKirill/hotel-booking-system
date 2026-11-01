@@ -1,5 +1,12 @@
 package ru.mephi.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import ru.mephi.api.ApiError;
@@ -41,28 +48,39 @@ public class BookingController {
     }
 
     @GetMapping
-    public BookingPage history(@AuthenticationPrincipal Jwt jwt,
+    public BookingPage history(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "20") int size) {
         return queries.history(jwt.getSubject(), page, size);
     }
 
     @GetMapping("/{id}")
-    public BookingResponse get(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+    public BookingResponse get(@PathVariable Long id, @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
         return queries.get(id, jwt.getSubject());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<BookingResponse> cancel(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+    @Operation(summary = "Отменить собственное бронирование", description = "Повторная отмена идемпотентна.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Отмена завершена", content = @Content(mediaType = "application/json", schema = @Schema(implementation = BookingResponse.class))),
+        @ApiResponse(responseCode = "202", description = "Намерение отмены сохранено; ожидается восстановление", content = @Content(mediaType = "application/json", schema = @Schema(implementation = BookingResponse.class)))
+    })
+    public ResponseEntity<BookingResponse> cancel(@PathVariable Long id, @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
         BookingResponse result = cancellations.cancel(id, jwt.getSubject());
         return ResponseEntity.status(result.status() == BookingStatus.CANCELLED
             ? HttpStatus.OK : HttpStatus.ACCEPTED).body(result);
     }
 
     @PostMapping
+    @Operation(summary = "Забронировать номер", description = "Ручной выбор или autoSelect. Повтор requestId с теми же параметрами возвращает ту же операцию.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Бронирование подтверждено в обоих сервисах", content = @Content(mediaType = "application/json", schema = @Schema(implementation = BookingResponse.class))),
+        @ApiResponse(responseCode = "202", description = "Операция сохранена и ожидает восстановления", content = @Content(mediaType = "application/json", schema = @Schema(implementation = BookingResponse.class))),
+        @ApiResponse(responseCode = "409", description = "BOOKING_CANCELLED: ID в fields.bookingId; либо IDEMPOTENCY_CONFLICT", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiError.class)))
+    })
     public ResponseEntity<?> create(
         @Valid @RequestBody CreateBookingRequest request,
-        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest) {
 
         String username = jwt.getSubject();
