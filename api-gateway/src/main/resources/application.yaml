@@ -9,6 +9,16 @@ spring:
             server:
                 webmvc:
                     routes:
+                        -   id: admin-hotel-route
+                            uri: lb://hotel-service
+                            predicates:
+                                - Path=/api/admin/rooms/**
+
+                        -   id: admin-users-route
+                            uri: lb://booking-service
+                            predicates:
+                                - Path=/api/admin/users/**
+
                         -   id: hotel-route
                             uri: lb://hotel-service
                             predicates:
