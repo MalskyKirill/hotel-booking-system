@@ -1,5 +1,9 @@
 package ru.mephi.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.MediaType;
+import ru.mephi.api.ApiError;
+import java.util.Map;
 import ru.mephi.service.BookingCancellationService;
 import ru.mephi.model.BookingStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,13 +60,19 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<BookingResponse> create(
+    public ResponseEntity<?> create(
         @Valid @RequestBody CreateBookingRequest request,
-        @AuthenticationPrincipal Jwt jwt) {
+        @AuthenticationPrincipal Jwt jwt,
+        HttpServletRequest servletRequest) {
 
         String username = jwt.getSubject();
         BookingResponse response = bookingService.create(request, username);
 
+        if (response.status() == BookingStatus.CANCELLED) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                .body(ApiError.of(HttpStatus.CONFLICT, "BOOKING_CANCELLED", "Booking was cancelled",
+                    servletRequest.getRequestURI(), Map.of("bookingId", response.id().toString(), "bookingStatus", "CANCELLED")));
+        }
         HttpStatus status = response.cancellationRequested() ? HttpStatus.ACCEPTED : switch (response.status()) {
             case CONFIRMED -> HttpStatus.OK;
             case PENDING -> HttpStatus.ACCEPTED;

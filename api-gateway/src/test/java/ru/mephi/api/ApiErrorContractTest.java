@@ -11,6 +11,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.util.Map;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -46,7 +48,17 @@ class ApiErrorContractTest {
             .andExpect(content().string(not(containsString("private-input"))))
             .andExpect(content().string(not(containsString("IllegalStateException"))));
     }
-    @ParameterizedTest @CsvSource({"404,NOT_FOUND", "503,SERVICE_UNAVAILABLE"})
+    @ParameterizedTest @CsvSource({"connect", "timeout"})
+    void wrappedTransportFailureReturnsServiceUnavailable(String failure) throws Exception {
+        mvc.perform(get("/test/upstream").param("failure", failure))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.status").value(503))
+            .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"))
+            .andExpect(jsonPath("$.path").value("/test/upstream"))
+            .andExpect(jsonPath("$.fields").isMap())
+            .andExpect(content().string(not(containsString("private-input"))));
+    }
+    @ParameterizedTest @CsvSource({"404,NOT_FOUND", "500,INTERNAL_ERROR", "503,SERVICE_UNAVAILABLE"})
     void servletFallbackUsesSameContract(int status, String code) throws Exception {
         mvc.perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, status)
                 .requestAttr(RequestDispatcher.ERROR_REQUEST_URI, "/original"))
@@ -62,6 +74,11 @@ class ApiErrorContractTest {
         @GetMapping("/test/query") String query(@RequestParam Long id) { return id.toString(); }
         @PostMapping("/test/body") String body(@RequestBody Map<String,Object> body) { return "ok"; }
         @GetMapping("/test/conflict") void conflict() { throw new ResponseStatusException(HttpStatus.CONFLICT, "Conflict"); }
+        @GetMapping("/test/upstream") void upstream(@RequestParam String failure) {
+            Exception cause = failure.equals("connect") ? new ConnectException("private-input")
+                : new SocketTimeoutException("private-input");
+            throw new RuntimeException(new RuntimeException(cause));
+        }
         @GetMapping("/test/failure") void failure() { throw new IllegalStateException("private-input"); }
     }
 }

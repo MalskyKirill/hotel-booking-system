@@ -15,6 +15,10 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.client.*;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.net.http.HttpTimeoutException;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -76,6 +80,15 @@ public class CommonApiExceptionHandler {
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest request) {
+        // Gateway MVC can wrap transport errors in RuntimeException before MVC advice sees them.
+        Throwable cause = ex;
+        for (int depth = 0; cause != null && depth < 20; depth++, cause = cause.getCause()) {
+            if (cause instanceof SocketException || cause instanceof SocketTimeoutException
+                    || cause instanceof UnknownHostException || cause instanceof HttpTimeoutException
+                    || cause instanceof ResourceAccessException) {
+                return unavailable(request);
+            }
+        }
         log.error("Unhandled API failure: path={}, type={}", request.getRequestURI(), ex.getClass().getName());
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error", request);
     }

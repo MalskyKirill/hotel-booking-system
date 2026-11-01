@@ -19,6 +19,14 @@
             "key": "nonExistentId",
             "value": "999999",
             "type": "string"
+        },
+        {
+            "key": "token",
+            "value": ""
+        },
+        {
+            "key": "adminToken",
+            "value": ""
         }
     ],
     "item": [
@@ -81,6 +89,16 @@
                         "api",
                         "hotels"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -126,6 +144,16 @@
                         "api",
                         "hotels"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -164,6 +192,16 @@
                     "path": [
                         "api",
                         "hotels"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
                     ]
                 }
             }
@@ -209,6 +247,16 @@
                         "api",
                         "hotels"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{token}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -252,6 +300,16 @@
                         "hotels",
                         "{{hotelId}}"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{token}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -275,7 +333,7 @@
                             "",
                             "pm.test('Тело содержит id запрошенного отеля', function () {",
                             "    const body = pm.response.json();",
-                            "    pm.expect(String(body.id)).to.eql(pm.collectionVariables.get('nonExistentId'));",
+                            "    pm.expect(body.code).to.eql('HOTEL_NOT_FOUND');",
                             "});",
                             "",
                             "pm.test('Content-Type — application/json', function () {",
@@ -298,6 +356,16 @@
                         "api",
                         "hotels",
                         "{{nonExistentId}}"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{token}}",
+                            "type": "string"
+                        }
                     ]
                 }
             }
@@ -329,6 +397,16 @@
                         "api",
                         "hotels",
                         "abc"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{token}}",
+                            "type": "string"
+                        }
                     ]
                 }
             }
@@ -380,6 +458,16 @@
                         "api",
                         "hotels",
                         "{{hotelId}}"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
                     ]
                 }
             }
@@ -433,6 +521,16 @@
                         "hotels",
                         "{{nonExistentId}}"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -480,6 +578,16 @@
                         "hotels",
                         "{{hotelId}}"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -524,6 +632,16 @@
                         "hotels",
                         "{{nonExistentId}}"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -563,6 +681,16 @@
                         "api",
                         "hotels"
                     ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
                 }
             }
         },
@@ -582,7 +710,27 @@
             "request": {
                 "method": "DELETE",
                 "header": [],
-                "url": { "raw": "{{baseUrl}}/api/hotels/{{hotelId}}", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "{{hotelId}}"] }
+                "url": {
+                    "raw": "{{baseUrl}}/api/hotels/{{hotelId}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{hotelId}}"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
+                }
             }
         },
         {
@@ -605,7 +753,27 @@
             "request": {
                 "method": "DELETE",
                 "header": [],
-                "url": { "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "{{nonExistentId}}"] }
+                "url": {
+                    "raw": "{{baseUrl}}/api/hotels/{{nonExistentId}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "{{nonExistentId}}"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
+                }
             }
         },
         {
@@ -623,7 +791,27 @@
             "request": {
                 "method": "DELETE",
                 "header": [],
-                "url": { "raw": "{{baseUrl}}/api/hotels/abc", "host": ["{{baseUrl}}"], "path": ["api", "hotels", "abc"] }
+                "url": {
+                    "raw": "{{baseUrl}}/api/hotels/abc",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "hotels",
+                        "abc"
+                    ]
+                },
+                "auth": {
+                    "type": "bearer",
+                    "bearer": [
+                        {
+                            "key": "token",
+                            "value": "{{adminToken}}",
+                            "type": "string"
+                        }
+                    ]
+                }
             }
         }
     ]

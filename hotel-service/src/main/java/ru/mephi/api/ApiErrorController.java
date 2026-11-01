@@ -17,7 +17,7 @@ public class ApiErrorController implements ErrorController {
         if (known == null || status < 400) { status = 500; known = HttpStatus.INTERNAL_SERVER_ERROR; }
         Object original = request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
         String path = original instanceof String uri ? uri : request.getRequestURI();
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiError.of(known, known.name(),
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiError.of(known, status == 500 ? "INTERNAL_ERROR" : known.name(),
             status >= 500 ? "Internal server error" : known.getReasonPhrase(), path, Map.of()));
     }
 }

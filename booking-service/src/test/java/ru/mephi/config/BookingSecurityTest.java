@@ -114,12 +114,18 @@ class BookingSecurityTest {
         when(bookingService.create(any(CreateBookingRequest.class), eq("alice")))
             .thenReturn(new BookingResponse(1L, 2L, LocalDate.of(2027, 1, 1),
                 LocalDate.of(2027, 1, 2), bookingStatus, Instant.now()));
-        mvc.perform(post("/api/bookings")
+        var result = mvc.perform(post("/api/bookings")
                 .header("Authorization", "Bearer test-token")
                 .contentType(MediaType.APPLICATION_JSON).content(REQUEST))
-            .andExpect(status().is(httpStatus))
-            .andExpect(jsonPath("$.status").value(bookingStatus.name()))
-            .andExpect(jsonPath("$.id").value(1));
+            .andExpect(status().is(httpStatus));
+        if (bookingStatus == BookingStatus.CANCELLED) {
+            result.andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code").value("BOOKING_CANCELLED"))
+                .andExpect(jsonPath("$.fields.bookingId").value("1"))
+                .andExpect(jsonPath("$.fields.bookingStatus").value("CANCELLED"));
+        } else {
+            result.andExpect(jsonPath("$.status").value(bookingStatus.name())).andExpect(jsonPath("$.id").value(1));
+        }
     }
 
     @Test

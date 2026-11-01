@@ -46,7 +46,7 @@ class ApiErrorContractTest {
             .andExpect(content().string(not(containsString("private-input"))))
             .andExpect(content().string(not(containsString("IllegalStateException"))));
     }
-    @ParameterizedTest @CsvSource({"404,NOT_FOUND", "503,SERVICE_UNAVAILABLE"})
+    @ParameterizedTest @CsvSource({"404,NOT_FOUND", "500,INTERNAL_ERROR", "503,SERVICE_UNAVAILABLE"})
     void servletFallbackUsesSameContract(int status, String code) throws Exception {
         mvc.perform(get("/error").requestAttr(RequestDispatcher.ERROR_STATUS_CODE, status)
                 .requestAttr(RequestDispatcher.ERROR_REQUEST_URI, "/original"))
