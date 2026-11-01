@@ -98,6 +98,26 @@ class AutoReservationTest {
         assertThrows(NoAvailableRoomException.class, () -> service.reserve(
             new AutoReservationRequest(2L, hotelId + 100, request(1L).startDate(), request(1L).endDate())));
     }
+    @Test
+    void explicitAutoCancellationReleasesConfirmedSlotAndPreservesSelection() {
+        var request = request(1L); var held = service.reserve(request); service.confirm(request);
+        assertEquals(ReservationStatus.RELEASED, service.cancel(request).status());
+        assertEquals(held.roomId(), service.cancel(request).roomId());
+        assertEquals(ReservationStatus.RELEASED, service.reserve(request).status());
+        assertEquals(1, rooms.findById(held.roomId()).orElseThrow().getTimesBooked());
+        assertTrue(search.search(hotelId, request.startDate(), request.endDate(), false).stream()
+            .anyMatch(room -> room.getId().equals(held.roomId())));
+        assertEquals(ReservationStatus.HELD, service.reserve(request(2L)).status());
+    }
+
+    @Test
+    void explicitAutoCancellationBeforeSelectionRemainsTerminal() {
+        var request = request(1L);
+        assertNull(service.cancel(request).roomId());
+        assertEquals(ReservationStatus.RELEASED, service.reserve(request).status());
+        assertThrows(InvalidReservationStateException.class, () -> service.confirm(request));
+    }
+
     private AutoReservationRequest request(Long id) {
         return new AutoReservationRequest(id, hotelId, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 3));
     }

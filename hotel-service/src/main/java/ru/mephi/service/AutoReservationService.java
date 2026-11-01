@@ -49,6 +49,9 @@ public class AutoReservationService {
     public ReservationResponse confirm(AutoReservationRequest request) {
         ensure(request); return transactions.confirm(request);
     }
+    public ReservationResponse cancel(AutoReservationRequest request) {
+        ensure(request); return transactions.cancel(request);
+    }
     public ReservationResponse release(AutoReservationRequest request) {
         ensure(request); return transactions.release(request);
     }

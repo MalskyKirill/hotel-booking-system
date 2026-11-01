@@ -53,6 +53,13 @@ public class RoomReservationController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{bookingId}/cancel")
+    public ReservationResponse cancel(@PathVariable Long bookingId,
+                                       @Valid @RequestBody CreateReservationRequest request) {
+        if (!bookingId.equals(request.bookingId())) throw new IdempotencyConflictException(bookingId);
+        return reservationService.cancel(request);
+    }
+
     /**
      * Получить текущее состояние резервирования.
      * Используется для разрешения неопределенности (reconciliation).

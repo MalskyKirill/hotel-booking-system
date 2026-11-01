@@ -29,7 +29,7 @@ class AutoReservationClientTest {
     }
     @ParameterizedTest
     @CsvSource({"reserve,HELD,7", "reserve,CONFIRMED,7", "confirm,CONFIRMED,7",
-        "release,RELEASED,null", "status,RELEASED,null", "status,HELD,7"})
+        "release,RELEASED,null", "cancel,RELEASED,null", "status,RELEASED,null", "status,HELD,7"})
     void usesAutomaticOperationAndAcceptsUnselectedCancellation(String operation, String status, String room) {
         server.expect(requestTo(url(operation))).andExpect(method(HttpMethod.POST))
             .andExpect(http -> {
@@ -85,6 +85,7 @@ class AutoReservationClientTest {
             case "reserve" -> client.reserveAuto(request);
             case "confirm" -> client.confirmAuto(request);
             case "release" -> client.releaseAuto(request);
+            case "cancel" -> client.cancelAuto(request);
             default -> client.getAutoStatus(request);
         };
     }

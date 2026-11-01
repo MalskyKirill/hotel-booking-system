@@ -147,6 +147,15 @@ public class RoomReservationTransactions {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReservationResponse release(CreateReservationRequest request) {
+        return releaseRequest(request, false);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ReservationResponse cancel(CreateReservationRequest request) {
+        return releaseRequest(request, true);
+    }
+
+    private ReservationResponse releaseRequest(CreateReservationRequest request, boolean allowConfirmed) {
         Room room = roomRepository.findByIdForUpdate(request.roomId())
             .orElseThrow(() -> new RoomNotFoundException(request.roomId()));
         Optional<RoomReservation> existing = reservationRepository.findByBookingId(request.bookingId());
@@ -157,7 +166,7 @@ public class RoomReservationTransactions {
                 || !reservation.getEndDate().equals(request.endDate())) {
                 throw new IdempotencyConflictException(request.bookingId());
             }
-            return release(request.bookingId());
+            return releaseExisting(request.bookingId(), allowConfirmed);
         }
         // Терминальная запись не занимает даты и запрещает запоздавший reserve.
         RoomReservation cancelled = new RoomReservation();
@@ -179,7 +188,16 @@ public class RoomReservationTransactions {
         return releaseExisting(bookingId);
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ReservationResponse cancelInTransaction(Long bookingId) {
+        return releaseExisting(bookingId, true);
+    }
+
     private ReservationResponse releaseExisting(Long bookingId) {
+        return releaseExisting(bookingId, false);
+    }
+
+    private ReservationResponse releaseExisting(Long bookingId, boolean allowConfirmed) {
         // Первичное чтение
         RoomReservation reservation = reservationRepository.findByBookingId(bookingId)
             .orElseThrow(() -> new ReservationNotFoundException(bookingId));
@@ -204,7 +222,11 @@ public class RoomReservationTransactions {
                 break;
 
             case CONFIRMED:
-                // Запрещено освобождать подтвержденные брони через этот метод
+                if (allowConfirmed) {
+                    reservation.setStatus(ReservationStatus.RELEASED);
+                    break;
+                }
+                // Компенсация не отменяет подтверждённую бронь.
                 throw new InvalidReservationStateException(bookingId,
                     "Cannot release a confirmed reservation. Use cancellation instead.");
 

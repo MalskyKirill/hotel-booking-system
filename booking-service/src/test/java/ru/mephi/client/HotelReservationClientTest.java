@@ -39,12 +39,12 @@ class HotelReservationClientTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"reserve,HELD", "reserve,CONFIRMED", "confirm,CONFIRMED", "release,RELEASED",
+    @CsvSource({"reserve,HELD", "reserve,CONFIRMED", "confirm,CONFIRMED", "release,RELEASED", "cancel,RELEASED",
         "status,HELD", "status,CONFIRMED", "status,RELEASED"})
     void sendsOperationAndReadsExpectedState(String operation, ReservationStatus status) {
         var expectation = server.expect(requestTo(url(operation)))
             .andExpect(method(operation.equals("status") ? HttpMethod.GET : HttpMethod.POST));
-        if (operation.equals("reserve") || operation.equals("release")) {
+        if (operation.equals("reserve") || operation.equals("release") || operation.equals("cancel")) {
             expectation.andExpect(httpRequest -> {
                 String body = ((org.springframework.mock.http.client.MockClientHttpRequest) httpRequest).getBodyAsString();
                 CreateReservationRequest sent = new com.fasterxml.jackson.databind.ObjectMapper()
@@ -140,7 +140,7 @@ class HotelReservationClientTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"confirm,HELD", "confirm,RELEASED", "release,CONFIRMED", "release,HELD"})
+    @CsvSource({"confirm,HELD", "confirm,RELEASED", "release,CONFIRMED", "release,HELD", "cancel,HELD", "cancel,CONFIRMED"})
     void unexpectedOperationStateIsNotSuccess(String operation, String status) {
         server.expect(requestTo(url(operation))).andRespond(withSuccess(response(status), MediaType.APPLICATION_JSON));
         assertThrows(RemoteServiceUncertainException.class, () -> invoke(operation));
@@ -152,6 +152,7 @@ class HotelReservationClientTest {
             case "reserve" -> client.reserve(request);
             case "confirm" -> client.confirm(request);
             case "release" -> client.release(request);
+            case "cancel" -> client.cancel(request);
             case "status" -> client.getStatus(request);
             default -> throw new IllegalArgumentException(operation);
         };

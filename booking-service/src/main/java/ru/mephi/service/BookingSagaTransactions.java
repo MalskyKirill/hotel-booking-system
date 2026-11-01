@@ -1,5 +1,6 @@
 package ru.mephi.service;
 
+import ru.mephi.exception.BookingNotFoundException;
 import ru.mephi.exception.RemoteServiceUncertainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,13 +33,25 @@ public class BookingSagaTransactions {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BookingResponse requestCancellation(Long id, String username) {
+        Booking booking = bookings.findByIdForUpdate(id)
+            .orElseThrow(BookingNotFoundException::new);
+        if (!booking.getUser().getUsername().equals(username)) throw new BookingNotFoundException();
+        if (booking.getStatus() != BookingStatus.CANCELLED) {
+            booking.setCancellationRequested(true);
+            booking.setSagaNextAttemptAt(Instant.now());
+        }
+        return snapshot(booking).booking();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void selectRoom(Long id, Long roomId) {
         Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
         if (!booking.isAutoSelect()) throw new IllegalStateException("Not an automatic selection");
         if (booking.getRoomId() != null && !booking.getRoomId().equals(roomId)) {
             throw new RemoteServiceUncertainException("Selected room changed remotely");
         }
-        if (booking.getStatus() == BookingStatus.PENDING) booking.setRoomId(roomId);
+        if (booking.getStatus() == BookingStatus.PENDING || booking.isCancellationRequested()) booking.setRoomId(roomId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -50,14 +63,17 @@ public class BookingSagaTransactions {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BookingResponse cancel(Long id) {
         Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
-        if (booking.getStatus() == BookingStatus.PENDING) booking.setStatus(BookingStatus.CANCELLED);
+        if (booking.getStatus() == BookingStatus.PENDING || booking.isCancellationRequested()) {
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setCancellationRequested(false);
+        }
         return snapshot(booking).booking();
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BookingResponse defer(Long id) {
         Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
-        if (booking.getStatus() == BookingStatus.PENDING) {
+        if (booking.getStatus() == BookingStatus.PENDING || booking.isCancellationRequested()) {
             int attempts = Math.min(30, booking.getSagaRecoveryAttempts() + 1);
             booking.setSagaRecoveryAttempts(attempts);
             booking.setSagaNextAttemptAt(Instant.now().plusSeconds(Math.min(300, 5L << Math.min(6, attempts - 1))));
@@ -66,8 +82,7 @@ public class BookingSagaTransactions {
     }
 
     private BookingSagaSnapshot snapshot(Booking booking) {
-        return new BookingSagaSnapshot(new BookingResponse(booking.getId(), booking.getRoomId(),
-            booking.getStartDate(), booking.getEndDate(), booking.getStatus(), booking.getCreatedAt()),
+        return new BookingSagaSnapshot(BookingResponse.from(booking),
             booking.getRequestId(), booking.isSagaCompensating(), booking.isAutoSelect(), booking.getHotelId());
     }
 }

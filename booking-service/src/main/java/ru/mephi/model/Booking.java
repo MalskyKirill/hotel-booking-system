@@ -31,6 +31,10 @@ public class Booking {
     @Column(name = "request_id", nullable = false, unique = true)
     private String requestId;
 
+    @Column(nullable = false) private boolean cancellationRequested;
+    public boolean isCancellationRequested() { return cancellationRequested; }
+    public void setCancellationRequested(boolean value) { cancellationRequested = value; }
+
     @Column(nullable = false) private boolean autoSelect;
     private Long hotelId;
     public boolean isAutoSelect() { return autoSelect; }

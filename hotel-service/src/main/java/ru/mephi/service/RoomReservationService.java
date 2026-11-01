@@ -32,6 +32,15 @@ public class RoomReservationService {
         }
     }
 
+    public ReservationResponse cancel(CreateReservationRequest request) {
+        try {
+            return transactions.cancel(request);
+        } catch (DataIntegrityViolationException ex) {
+            readWinner(request, ex);
+            return transactions.cancel(request);
+        }
+    }
+
     public ReservationResponse confirm(Long bookingId) {
         return transactions.confirm(bookingId);
     }

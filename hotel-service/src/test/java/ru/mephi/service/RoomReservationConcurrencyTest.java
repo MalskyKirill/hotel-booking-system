@@ -170,6 +170,35 @@ class RoomReservationConcurrencyTest {
             () -> roomService.search(null, request(1L).endDate(), request(1L).startDate(), true));
     }
 
+    @Test
+    void explicitCancellationReleasesConfirmedSlotWithoutDecrementingCounter() {
+        var request = request(1L);
+        service.reserve(request); service.confirm(1L);
+        assertEquals(ReservationStatus.RELEASED, service.cancel(request).status());
+        assertEquals(ReservationStatus.RELEASED, service.cancel(request).status());
+        assertEquals(1, rooms.findById(roomId).orElseThrow().getTimesBooked());
+        assertEquals(ReservationStatus.HELD, service.reserve(request(2L)).status());
+    }
+
+    @Test
+    void explicitCancellationBeforeReserveBlocksLateRequest() {
+        var request = request(1L);
+        assertEquals(ReservationStatus.RELEASED, service.cancel(request).status());
+        assertEquals(ReservationStatus.RELEASED, service.reserve(request).status());
+        assertThrows(InvalidReservationStateException.class, () -> service.confirm(1L));
+    }
+
+    @Test
+    void cancellationRacingWithConfirmAlwaysEndsReleased() throws Exception {
+        var request = request(1L); service.reserve(request);
+        var results = race(() -> service.confirm(1L), () -> service.cancel(request));
+        for (Object result : results) {
+            assertTrue(result instanceof ReservationResponse || result instanceof InvalidReservationStateException);
+        }
+        assertEquals(ReservationStatus.RELEASED, service.getByBookingId(1L).status());
+        assertTrue(rooms.findById(roomId).orElseThrow().getTimesBooked() <= 1);
+    }
+
     private CreateReservationRequest request(Long bookingId) {
         return new CreateReservationRequest(bookingId, roomId,
             LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 3));

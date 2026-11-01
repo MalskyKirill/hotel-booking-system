@@ -68,6 +68,14 @@ public class AutoReservationTransactions {
         existing(request, operation);
         return normal.confirmInTransaction(request.bookingId());
     }
+    public ReservationResponse cancel(AutoReservationRequest request) {
+        var operation = lock(request);
+        var previous = existing(request, operation);
+        if (previous != null && previous.roomId() != null) normal.cancelInTransaction(request.bookingId());
+        operation.cancel();
+        return existing(request, operation);
+    }
+
     public ReservationResponse release(AutoReservationRequest request) {
         var operation = lock(request);
         var previous = existing(request, operation);

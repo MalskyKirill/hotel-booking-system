@@ -31,12 +31,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(showSql = false, properties = "booking.saga.remote.initial-delay-ms=0")
-@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class, BookingSagaRecovery.class})
+@Import({BookingService.class, BookingPendingService.class, BookingCreationTransactions.class, BookingSagaTransactions.class, BookingSagaCoordinator.class, HotelCallRetry.class, BookingSagaRecovery.class, BookingCancellationService.class, BookingQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingSagaIntegrationTest {
     @Autowired private BookingService service;
     @Autowired private BookingSagaRecovery recovery;
-    @Autowired private BookingSagaTransactions sagaState;
+    @MockitoSpyBean private BookingSagaTransactions sagaState;
+    @Autowired private BookingCancellationService cancellations;
+    @Autowired private BookingQueryService queries;
     @MockitoSpyBean private BookingCreationTransactions transactions;
     @Autowired private BookingPendingService pendingService;
     @Autowired private BookingRepository bookings;
@@ -338,6 +340,115 @@ class BookingSagaIntegrationTest {
 
     private ReservationResponse autoResponse(AutoReservationRequest request, Long roomId, ReservationStatus status) {
         return new ReservationResponse(request.bookingId(), roomId, request.startDate(), request.endDate(), status);
+    }
+
+    @Test
+    void ownerCancellationIsIdempotentAndForeignOwnerCannotCancel() {
+        BookingResponse confirmed = service.create(request, "alice");
+        assertThrows(ru.mephi.exception.BookingNotFoundException.class,
+            () -> cancellations.cancel(confirmed.id(), "bob"));
+        verify(hotel, never()).cancel(any());
+        doAnswer(inv -> {
+            CreateReservationRequest remote = inv.getArgument(0);
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            assertTrue(bookings.findById(remote.bookingId()).orElseThrow().isCancellationRequested());
+            return response(remote, ReservationStatus.RELEASED);
+        }).when(hotel).cancel(any());
+        BookingResponse cancelled = cancellations.cancel(confirmed.id(), "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertFalse(cancelled.cancellationRequested());
+        assertEquals(cancelled, cancellations.cancel(confirmed.id(), "alice"));
+        assertEquals(cancelled, queries.get(confirmed.id(), "alice"));
+        verify(hotel, times(1)).cancel(any());
+        verify(hotel, never()).release(any());
+    }
+
+    @Test
+    void cancellationBeforeAutomaticSelectionDoesNotStartReservation() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "cancel-auto", true, null);
+        BookingResponse pending = pendingService.create(auto, "alice");
+        doAnswer(inv -> autoResponse(inv.getArgument(0), null, ReservationStatus.RELEASED)).when(hotel).cancelAuto(any());
+        BookingResponse cancelled = cancellations.cancel(pending.id(), "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertNull(cancelled.roomId());
+        verify(hotel, never()).reserveAuto(any());
+    }
+
+    @Test
+    void unavailableCancellationIsVisibleAndRecoveredWithoutUserRetry() {
+        BookingResponse confirmed = service.create(request, "alice");
+        doThrow(new RemoteServiceUncertainException("offline")).when(hotel).cancel(any());
+        doThrow(new RemoteServiceUncertainException("offline")).when(hotel).getStatus(any());
+        BookingResponse waiting = cancellations.cancel(confirmed.id(), "alice");
+        assertEquals(BookingStatus.CONFIRMED, waiting.status());
+        assertTrue(waiting.cancellationRequested());
+        assertTrue(queries.get(confirmed.id(), "alice").cancellationRequested());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).cancel(any());
+        makeDue(confirmed.id()); recovery.recoverDue();
+        var cancelled = queries.get(confirmed.id(), "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertFalse(cancelled.cancellationRequested());
+        verify(hotel, times(4)).cancel(any());
+    }
+
+    @Test
+    void lostCancellationResponseIsResolvedByReleasedState() {
+        BookingResponse confirmed = service.create(request, "alice");
+        doThrow(new RemoteServiceUncertainException("lost response")).when(hotel).cancel(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).getStatus(any());
+        assertEquals(BookingStatus.CANCELLED, cancellations.cancel(confirmed.id(), "alice").status());
+        verify(hotel, times(3)).cancel(any());
+    }
+
+    @Test
+    void localCommitFailureAfterRemoteCancellationRemainsRecoverable() {
+        BookingResponse confirmed = service.create(request, "alice");
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).cancel(any());
+        doThrow(new org.springframework.dao.TransientDataAccessResourceException("temporary DB failure"))
+            .doCallRealMethod().when(sagaState).cancel(confirmed.id());
+        assertTrue(cancellations.cancel(confirmed.id(), "alice").cancellationRequested());
+        makeDue(confirmed.id()); recovery.recoverDue();
+        assertEquals(BookingStatus.CANCELLED, queries.get(confirmed.id(), "alice").status());
+    }
+
+    @Test
+    void delayedForwardConfirmationCannotReviveCancelledBooking() throws Exception {
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var proceed = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(inv -> {
+            entered.countDown();
+            assertTrue(proceed.await(5, TimeUnit.SECONDS));
+            return response(inv.getArgument(0), ReservationStatus.CONFIRMED);
+        }).when(hotel).confirm(any());
+        doAnswer(inv -> response(inv.getArgument(0), ReservationStatus.RELEASED)).when(hotel).cancel(any());
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var future = executor.submit(() -> service.create(request, "alice"));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var saved = bookings.findByRequestId(request.requestId()).orElseThrow();
+            assertEquals(BookingStatus.CANCELLED, cancellations.cancel(saved.getId(), "alice").status());
+            proceed.countDown();
+            assertEquals(BookingStatus.CANCELLED, future.get(10, TimeUnit.SECONDS).status());
+            assertEquals(BookingStatus.CANCELLED, queries.get(saved.getId(), "alice").status());
+        } finally {
+            proceed.countDown(); executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void confirmedAutomaticBookingCanBeCancelledWithoutLosingSelectedRoom() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "auto-cancel-confirmed", true, 5L);
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.HELD)).when(hotel).reserveAuto(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.CONFIRMED)).when(hotel).confirmAuto(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.RELEASED)).when(hotel).cancelAuto(any());
+        var confirmed = service.create(auto, "alice");
+        var cancelled = cancellations.cancel(confirmed.id(), "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertEquals(7L, cancelled.roomId());
+        assertFalse(cancelled.cancellationRequested());
+        verify(hotel, never()).cancel(any());
+        verify(hotel, never()).releaseAuto(any());
     }
 
     private void makeDue(Long id) {
