@@ -7,6 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.util.*;
 import java.util.concurrent.*;
+import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 import static ru.mephi.system.HotelFaultProxy.Action.*;
 
@@ -20,6 +21,7 @@ class BookingSystemIT {
         try { s.start(); } catch (Exception | Error ex) { s.close(); throw ex; }
     }
     @AfterAll void stop() { if (s != null) s.close(); }
+    @BeforeEach @Timeout(70) void isolateCircuitState() throws Exception { s.establishHealthyCircuit(); }
 
     @Test void accessAndErrorContract() throws Exception {
         s.get("/api/hotels", null).error(401, "UNAUTHORIZED", "/api/hotels");
@@ -84,7 +86,14 @@ class BookingSystemIT {
         CyclicBarrier barrier = new CyclicBarrier(8);
         try (ExecutorService executor = Executors.newFixedThreadPool(8)) {
             List<Future<LiveStack.Response>> results = new ArrayList<>();
-            for (var request : requests) results.add(executor.submit(() -> { barrier.await(10, TimeUnit.SECONDS); return s.create(request); }));
+            for (var request : requests) results.add(executor.submit(() -> {
+                String trace = "parallel-" + UUID.randomUUID();
+                barrier.await(10, TimeUnit.SECONDS);
+                var response = s.correlated("/api/bookings", "POST", request, s.user, trace);
+                assertEquals(trace, response.traceId());
+                for (var call : s.proxy.observations(trace)) assertEquals(trace, call.upstreamTraceId());
+                return response;
+            }));
             List<LiveStack.Response> responses = new ArrayList<>();
             for (var result : results) responses.add(result.get(60, TimeUnit.SECONDS));
             return responses;
@@ -210,8 +219,11 @@ class BookingSystemIT {
         var fixture = s.fixture(1);
         var request = s.booking(fixture, automatic);
         long id;
+        String originalTrace;
         try (var fault = s.proxy.rule((m, p) -> p.startsWith("/internal/"), REJECT_BEFORE)) {
-            JsonNode pending = s.create(request).require(202);
+            var pendingResponse = s.create(request);
+            originalTrace = pendingResponse.traceId();
+            JsonNode pending = pendingResponse.require(202);
             id = pending.path("id").asLong();
             assertEquals("PENDING", pending.path("status").asText());
             if (automatic) assertTrue(pending.path("roomId").isNull());
@@ -219,6 +231,7 @@ class BookingSystemIT {
             assertTrue(fault.hits() >= 3);
         }
         s.settled(id, "CANCELLED"); // GET cannot drive Saga; only the scheduler can settle it.
+        s.assertRecoveryTrace(id, originalTrace);
         assertEquals("RELEASED", s.remote(id, request).path("status").asText());
         assertEquals(id, s.create(request).error(409, "BOOKING_CANCELLED", "/api/bookings").path("fields").path("bookingId").asLong());
         assertEquals(0, s.room(fixture.rooms().getFirst()).path("timesBooked").asInt());
@@ -237,6 +250,82 @@ class BookingSystemIT {
         assertEquals(fixture.rooms().getFirst().longValue(), s.search(fixture.hotel(), false).get(0).path("id").asLong());
         assertEquals(1, s.room(fixture.rooms().getFirst()).path("timesBooked").asInt());
     }
+    @Test void oneTraceConnectsGatewayBookingHotelAndStructuredLogs() throws Exception {
+        var fixture = s.fixture(1);
+        String trace = "booking-" + UUID.randomUUID();
+        var response = s.correlated("/api/bookings", "POST", s.booking(fixture, false), s.user, trace);
+        long id = response.require(200).path("id").asLong();
+        assertEquals(trace, response.traceId());
+        var calls = s.proxy.observations(trace);
+        assertEquals(2, calls.size());
+        for (var call : calls) {
+            assertEquals(trace, call.upstreamTraceId());
+            assertEquals(200, call.upstreamStatus());
+        }
+        for (String service : List.of("api-gateway", "booking-service", "hotel-service")) s.assertHttpTrace(service, trace, 200);
+        s.awaitEvent("booking-service", e -> e.path("traceId").asText().equals(trace)
+            && e.path("message").asText().equals("Saga settled: bookingId=" + id + ", status=CONFIRMED"));
+    }
+
+    @Test void correlationSurvivesAuthorizationAndValidationErrors() throws Exception {
+        String denied = "denied-" + UUID.randomUUID();
+        var unauthorized = s.correlated("/api/hotels", "GET", null, null, denied);
+        unauthorized.error(401, "UNAUTHORIZED", "/api/hotels");
+        assertEquals(denied, unauthorized.traceId());
+        s.assertHttpTrace("api-gateway", denied, 401);
+        s.assertHttpTrace("hotel-service", denied, 401);
+        String invalid = "validation-" + UUID.randomUUID();
+        var request = s.booking(s.fixture(1), false);
+        request.put("endDate", "2026-01-01");
+        var bad = s.correlated("/api/bookings", "POST", request, s.user, invalid);
+        bad.error(400, "VALIDATION_FAILED", "/api/bookings");
+        assertEquals(invalid, bad.traceId());
+        s.assertHttpTrace("api-gateway", invalid, 400);
+        s.assertHttpTrace("booking-service", invalid, 400);
+        assertTrue(s.proxy.observations(invalid).isEmpty());
+    }
+
+    @Test void openCircuitBlocksHttpCallsAndSchedulerRecoversPendingAndCancellation() throws Exception {
+        var fixture = s.fixture(1);
+        long confirmed = s.create(s.booking(fixture, false)).require(200).path("id").asLong();
+        String trace = "circuit-" + UUID.randomUUID();
+        Instant started = Instant.now();
+        List<Long> pendingIds = new ArrayList<>();
+        try (var fault = s.proxy.rule((m, p) -> p.startsWith("/internal/"), REJECT_BEFORE)) {
+            // A warmed window has ten successes; five exhausted logical calls open it.
+            for (int i = 0; i < 3; i++) {
+                var response = s.correlated("/api/bookings", "POST", s.booking(fixture, false), s.user, trace + "-" + i);
+                JsonNode pending = response.require(202);
+                assertEquals("PENDING", pending.path("status").asText());
+                pendingIds.add(pending.path("id").asLong());
+            }
+            s.awaitEvent("booking-service", e -> e.path("traceId").asText().startsWith(trace)
+                && e.path("circuit").path("to").asText().equals("OPEN"));
+            int callsBefore = fault.hits();
+            var blocked = s.correlated("/api/bookings", "POST", s.booking(fixture, false), s.user, trace + "-blocked");
+            pendingIds.add(blocked.require(202).path("id").asLong());
+            assertEquals(callsBefore, fault.hits(), "Open circuit still sent HTTP calls");
+            JsonNode cancelling = s.call("/api/bookings/" + confirmed, "DELETE", null, s.user).require(202);
+            assertTrue(cancelling.path("cancellationRequested").asBoolean());
+            assertEquals("CONFIRMED", cancelling.path("status").asText());
+            assertEquals(callsBefore, fault.hits(), "Open circuit still attempted cancel/status");
+            assertEquals("CONFIRMED", s.reservation(confirmed).path("status").asText());
+        }
+        // Reads alone observe scheduler recovery. The circuit remains enabled with production timings.
+        for (long id : pendingIds) {
+            s.settled(id, "CANCELLED");
+            assertEquals("RELEASED", s.reservation(id).path("status").asText());
+        }
+        s.settled(confirmed, "CANCELLED");
+        assertEquals("RELEASED", s.reservation(confirmed).path("status").asText());
+        s.awaitEvent("booking-service", e -> e.path("circuit").path("to").asText().equals("HALF_OPEN")
+            && !Instant.parse(e.path("@timestamp").asText()).isBefore(started));
+        s.awaitEvent("booking-service", e -> e.path("circuit").path("from").asText().equals("HALF_OPEN")
+            && e.path("circuit").path("to").asText().equals("CLOSED") && !Instant.parse(e.path("@timestamp").asText()).isBefore(started));
+        long after = s.create(s.booking(fixture, false)).require(200).path("id").asLong();
+        assertEquals("CONFIRMED", s.reservation(after).path("status").asText());
+    }
+
     @Test void lostCancelResponsesReconcileReleasedState() throws Exception {
         var fixture = s.fixture(1);
         long id = s.create(s.booking(fixture, false)).require(200).path("id").asLong();

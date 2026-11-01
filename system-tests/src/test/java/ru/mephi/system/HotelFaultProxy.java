@@ -21,6 +21,11 @@ final class HotelFaultProxy implements AutoCloseable {
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
     private final int target;
     private volatile Rule active;
+    record Observation(String method, String path, String traceId, Integer upstreamStatus, String upstreamTraceId) { }
+    private final Queue<Observation> observed = new ConcurrentLinkedQueue<>();
+    List<Observation> observations(String traceId) {
+        return observed.stream().filter(o -> Objects.equals(traceId, o.traceId())).toList();
+    }
 
     HotelFaultProxy(int port, int target) throws IOException {
         this.target = target;
@@ -73,6 +78,8 @@ final class HotelFaultProxy implements AutoCloseable {
         if (rule != null && !rule.predicate.test(exchange.getRequestMethod(), exchange.getRequestURI().getPath())) rule = null;
         if (rule != null) rule.capture();
         Integer status = null;
+        String responseTrace = null;
+        String trace = exchange.getRequestHeaders().getFirst("X-Correlation-Id");
         try (exchange) {
             byte[] body = exchange.getRequestBody().readAllBytes();
             if (rule != null && rule.action == Action.REJECT_BEFORE) {
@@ -91,6 +98,7 @@ final class HotelFaultProxy implements AutoCloseable {
             });
             HttpResponse<byte[]> response = client.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
             status = response.statusCode();
+            responseTrace = response.headers().firstValue("X-Correlation-Id").orElse(null);
             if (rule != null && rule.action == Action.DROP_AFTER) return; // close with no HTTP response
             response.headers().map().forEach((name, values) -> {
                 if (!HOP.contains(name.toLowerCase(Locale.ROOT))) exchange.getResponseHeaders().put(name, values);
@@ -103,6 +111,7 @@ final class HotelFaultProxy implements AutoCloseable {
         } catch (IOException ignored) {
             // Clients deliberately disconnect after read timeout. Never log credentials.
         } finally {
+            observed.add(new Observation(exchange.getRequestMethod(), exchange.getRequestURI().getPath(), trace, status, responseTrace));
             if (rule != null) rule.complete(status);
         }
     }
