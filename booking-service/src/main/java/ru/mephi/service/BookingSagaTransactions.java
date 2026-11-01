@@ -31,6 +31,16 @@ public class BookingSagaTransactions {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void selectRoom(Long id, Long roomId) {
+        Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
+        if (!booking.isAutoSelect()) throw new IllegalStateException("Not an automatic selection");
+        if (booking.getRoomId() != null && !booking.getRoomId().equals(roomId)) {
+            throw new ru.mephi.exception.RemoteServiceUncertainException("Selected room changed remotely");
+        }
+        if (booking.getStatus() == BookingStatus.PENDING) booking.setRoomId(roomId);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void beginCompensation(Long id) {
         Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
         if (booking.getStatus() == BookingStatus.PENDING) booking.setSagaCompensating(true);
@@ -57,6 +67,6 @@ public class BookingSagaTransactions {
     private BookingSagaSnapshot snapshot(Booking booking) {
         return new BookingSagaSnapshot(new BookingResponse(booking.getId(), booking.getRoomId(),
             booking.getStartDate(), booking.getEndDate(), booking.getStatus(), booking.getCreatedAt()),
-            booking.getRequestId(), booking.isSagaCompensating());
+            booking.getRequestId(), booking.isSagaCompensating(), booking.isAutoSelect(), booking.getHotelId());
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import ru.mephi.dto.CreateReservationRequest;
+import ru.mephi.dto.AutoReservationRequest;
 import ru.mephi.dto.ReservationResponse;
 import ru.mephi.dto.ReservationStatus;
 import ru.mephi.exception.RemoteBusinessConflictException;
@@ -58,6 +59,41 @@ public class HotelReservationClient {
         return invoke("getStatus", request, () -> restClient.get()
             .uri("/internal/reservations/{bookingId}", request.bookingId())
             .retrieve().body(ReservationResponse.class), EnumSet.allOf(ReservationStatus.class));
+    }
+
+    public ReservationResponse reserveAuto(AutoReservationRequest request) { return invokeAuto("reserve", request); }
+    public ReservationResponse confirmAuto(AutoReservationRequest request) { return invokeAuto("confirm", request); }
+    public ReservationResponse releaseAuto(AutoReservationRequest request) { return invokeAuto("release", request); }
+    public ReservationResponse getAutoStatus(AutoReservationRequest request) { return invokeAuto("status", request); }
+
+    private ReservationResponse invokeAuto(String operation, AutoReservationRequest request) {
+        ReservationResponse response;
+        try {
+            response = restClient.post().uri("/internal/auto-reservations" + (operation.equals("reserve") ? "" : "/" + operation))
+                .body(request).retrieve().body(ReservationResponse.class);
+        } catch (HttpClientErrorException.Conflict ex) {
+            throw new RemoteBusinessConflictException(errorCode(ex), "Automatic selection rejected");
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new RemoteReservationNotFoundException(request.bookingId());
+        } catch (HttpClientErrorException ex) {
+            throw new RemoteHotelRequestException(ex.getStatusCode().value(), errorCode(ex));
+        } catch (RestClientException ex) {
+            throw new RemoteServiceUncertainException("Automatic selection result is uncertain", ex);
+        }
+        if (response == null || !request.bookingId().equals(response.bookingId())
+            || !request.startDate().equals(response.startDate()) || !request.endDate().equals(response.endDate())
+            || response.status() == null || (response.status() != ReservationStatus.RELEASED
+                && (response.roomId() == null || response.roomId() <= 0))) {
+            throw new RemoteServiceUncertainException("Invalid automatic selection response");
+        }
+        if (operation.equals("reserve") && response.status() == ReservationStatus.RELEASED) {
+            throw new RemoteBusinessConflictException("RESERVATION_RELEASED", "Selection was already cancelled");
+        }
+        if ((operation.equals("confirm") && response.status() != ReservationStatus.CONFIRMED)
+            || (operation.equals("release") && response.status() != ReservationStatus.RELEASED)) {
+            throw new RemoteServiceUncertainException("Unexpected automatic selection state");
+        }
+        return response;
     }
 
     private ReservationResponse invoke(String operation, CreateReservationRequest request,

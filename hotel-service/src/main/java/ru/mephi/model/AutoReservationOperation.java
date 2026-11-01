@@ -9,6 +9,7 @@ import ru.mephi.exception.IdempotencyConflictException;
 @Entity
 public class AutoReservationOperation {
     @Id private Long bookingId;
+    @Version private Long version;
     private Long hotelId;
     @Column(nullable = false) private LocalDate startDate;
     @Column(nullable = false) private LocalDate endDate;

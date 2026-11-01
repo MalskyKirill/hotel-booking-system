@@ -43,6 +43,8 @@ public class BookingCreationTransactions {
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setRoomId(request.roomId());
+        booking.setAutoSelect(request.autoSelect());
+        booking.setHotelId(request.hotelId());
         booking.setStartDate(request.startDate());
         booking.setEndDate(request.endDate());
         booking.setRequestId(request.requestId());
@@ -66,6 +68,9 @@ public class BookingCreationTransactions {
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new IllegalStateException("Cannot confirm cancelled booking: " + bookingId);
         }
+        if (booking.isAutoSelect() && booking.getRoomId() == null) {
+            throw new IllegalStateException("Automatic selection has no room: " + bookingId);
+        }
         booking.setStatus(BookingStatus.CONFIRMED);
         return toResponse(booking);
     }
@@ -73,7 +78,9 @@ public class BookingCreationTransactions {
     private Optional<BookingResponse> findExisting(CreateBookingRequest request, User user) {
         return bookingRepository.findByRequestId(request.requestId()).map(booking -> {
             boolean sameOperation = booking.getUser().getId().equals(user.getId())
-                && booking.getRoomId().equals(request.roomId())
+                && booking.isAutoSelect() == request.autoSelect()
+                && java.util.Objects.equals(booking.getHotelId(), request.hotelId())
+                && (request.autoSelect() || java.util.Objects.equals(booking.getRoomId(), request.roomId()))
                 && booking.getStartDate().equals(request.startDate())
                 && booking.getEndDate().equals(request.endDate());
             if (!sameOperation) {

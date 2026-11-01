@@ -15,7 +15,7 @@ public class Booking {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    @Column(name = "room_id", nullable = false)
+    @Column(name = "room_id")
     private Long roomId;
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -30,6 +30,13 @@ public class Booking {
 
     @Column(name = "request_id", nullable = false, unique = true)
     private String requestId;
+
+    @Column(nullable = false) private boolean autoSelect;
+    private Long hotelId;
+    public boolean isAutoSelect() { return autoSelect; }
+    public void setAutoSelect(boolean value) { autoSelect = value; }
+    public Long getHotelId() { return hotelId; }
+    public void setHotelId(Long value) { hotelId = value; }
 
     @Column(nullable = false)
     private boolean sagaCompensating;

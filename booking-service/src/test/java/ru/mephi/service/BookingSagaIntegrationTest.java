@@ -263,6 +263,83 @@ class BookingSagaIntegrationTest {
         assertTrue(selected.getFirst() < selected.getLast());
     }
 
+    @Test
+    void automaticSelectionIsPersistedBeforeConfirmAndIgnoresRoomOnRepeat() {
+        var auto = new CreateBookingRequest(-99L, request.startDate(), request.endDate(), "auto-1", true, 5L);
+        doAnswer(inv -> {
+            AutoReservationRequest selected = inv.getArgument(0);
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            assertNull(bookings.findById(selected.bookingId()).orElseThrow().getRoomId());
+            return autoResponse(selected, 7L, ReservationStatus.HELD);
+        }).when(hotel).reserveAuto(any());
+        doAnswer(inv -> {
+            AutoReservationRequest selected = inv.getArgument(0);
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            assertEquals(7L, bookings.findById(selected.bookingId()).orElseThrow().getRoomId());
+            return autoResponse(selected, 7L, ReservationStatus.CONFIRMED);
+        }).when(hotel).confirmAuto(any());
+        BookingResponse confirmed = service.create(auto, "alice");
+        assertEquals(BookingStatus.CONFIRMED, confirmed.status());
+        assertEquals(7L, confirmed.roomId());
+        assertEquals(confirmed, service.create(new CreateBookingRequest(999L, auto.startDate(), auto.endDate(),
+            auto.requestId(), true, 5L), "alice"));
+        assertThrows(ru.mephi.exception.IdempotencyConflictException.class, () -> service.create(
+            new CreateBookingRequest(null, auto.startDate(), auto.endDate(), auto.requestId(), true, 6L), "alice"));
+        verify(hotel, times(1)).reserveAuto(any());
+        verify(hotel, never()).reserve(any());
+    }
+
+    @Test
+    void automaticSelectionTimeoutRecoversChosenRoomBeforeCompensation() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "auto-timeout", true, null);
+        doThrow(new RemoteServiceUncertainException("Lost selection response")).when(hotel).reserveAuto(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.HELD)).when(hotel).getAutoStatus(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), 7L, ReservationStatus.RELEASED)).when(hotel).releaseAuto(any());
+        BookingResponse cancelled = service.create(auto, "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertEquals(7L, cancelled.roomId());
+        verify(hotel, times(3)).reserveAuto(any());
+    }
+
+    @Test
+    void unavailableAutomaticSelectionCanBeCancelledWithoutRoom() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "auto-empty", true, null);
+        doThrow(new ru.mephi.exception.RemoteBusinessConflictException("NO_AVAILABLE_ROOM", "empty"))
+            .when(hotel).reserveAuto(any());
+        doThrow(new ru.mephi.exception.RemoteReservationNotFoundException(1L)).when(hotel).getAutoStatus(any());
+        doAnswer(inv -> autoResponse(inv.getArgument(0), null, ReservationStatus.RELEASED)).when(hotel).releaseAuto(any());
+        BookingResponse cancelled = service.create(auto, "alice");
+        assertEquals(BookingStatus.CANCELLED, cancelled.status());
+        assertNull(cancelled.roomId());
+        assertEquals(cancelled, service.create(auto, "alice"));
+        verify(hotel, times(1)).reserveAuto(any());
+    }
+
+    @Test
+    void workerRecoversAutomaticSelectionFromPersistedModeAndScope() {
+        var auto = new CreateBookingRequest(null, request.startDate(), request.endDate(), "auto-defer", true, 5L);
+        doThrow(new RemoteServiceUncertainException("Offline")).when(hotel).reserveAuto(any());
+        doThrow(new RemoteServiceUncertainException("Offline")).when(hotel).getAutoStatus(any());
+        BookingResponse pending = service.create(auto, "alice");
+        assertEquals(BookingStatus.PENDING, pending.status());
+        assertNull(pending.roomId());
+        doAnswer(inv -> {
+            AutoReservationRequest selected = inv.getArgument(0);
+            assertEquals(5L, selected.hotelId());
+            return autoResponse(selected, 7L, ReservationStatus.CONFIRMED);
+        }).when(hotel).getAutoStatus(any());
+        makeDue(pending.id());
+        recovery.recoverDue();
+        var saved = bookings.findById(pending.id()).orElseThrow();
+        assertEquals(BookingStatus.CONFIRMED, saved.getStatus());
+        assertEquals(7L, saved.getRoomId());
+        verify(hotel, times(3)).reserveAuto(any());
+    }
+
+    private ReservationResponse autoResponse(AutoReservationRequest request, Long roomId, ReservationStatus status) {
+        return new ReservationResponse(request.bookingId(), roomId, request.startDate(), request.endDate(), status);
+    }
+
     private void makeDue(Long id) {
         var booking = bookings.findById(id).orElseThrow();
         booking.setSagaNextAttemptAt(java.time.Instant.EPOCH);
