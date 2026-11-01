@@ -1,5 +1,9 @@
 package ru.mephi.repository;
 
+import java.time.LocalDate;
+import java.util.Collection;
+import ru.mephi.model.ReservationStatus;
+import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -23,10 +27,10 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
         "AND (:hotelId IS NULL OR r.hotel.id = :hotelId) " +
         "AND NOT EXISTS (SELECT x.id FROM RoomReservation x WHERE x.room = r " +
         "AND x.status IN :statuses AND x.startDate < :endDate AND x.endDate > :startDate)")
-    List<Room> findFree(@Param("hotelId") Long hotelId, @Param("startDate") java.time.LocalDate startDate,
-                        @Param("endDate") java.time.LocalDate endDate,
-                        @Param("statuses") java.util.Collection<ru.mephi.model.ReservationStatus> statuses,
-                        org.springframework.data.domain.Pageable pageable);
+    List<Room> findFree(@Param("hotelId") Long hotelId, @Param("startDate") LocalDate startDate,
+                        @Param("endDate") LocalDate endDate,
+                        @Param("statuses") Collection<ReservationStatus> statuses,
+                        Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Room r WHERE r.id = :id")

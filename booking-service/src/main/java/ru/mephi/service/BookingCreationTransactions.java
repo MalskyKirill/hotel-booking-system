@@ -1,5 +1,6 @@
 package ru.mephi.service;
 
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,8 +80,8 @@ public class BookingCreationTransactions {
         return bookingRepository.findByRequestId(request.requestId()).map(booking -> {
             boolean sameOperation = booking.getUser().getId().equals(user.getId())
                 && booking.isAutoSelect() == request.autoSelect()
-                && java.util.Objects.equals(booking.getHotelId(), request.hotelId())
-                && (request.autoSelect() || java.util.Objects.equals(booking.getRoomId(), request.roomId()))
+                && Objects.equals(booking.getHotelId(), request.hotelId())
+                && (request.autoSelect() || Objects.equals(booking.getRoomId(), request.roomId()))
                 && booking.getStartDate().equals(request.startDate())
                 && booking.getEndDate().equals(request.endDate());
             if (!sameOperation) {

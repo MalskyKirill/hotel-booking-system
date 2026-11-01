@@ -82,8 +82,8 @@ public class HotelReservationClient {
         }
         if (response == null || !request.bookingId().equals(response.bookingId())
             || !request.startDate().equals(response.startDate()) || !request.endDate().equals(response.endDate())
-            || response.status() == null || (response.status() != ReservationStatus.RELEASED
-                && (response.roomId() == null || response.roomId() <= 0))) {
+            || response.status() == null || (response.roomId() != null && response.roomId() <= 0)
+            || (response.status() != ReservationStatus.RELEASED && response.roomId() == null)) {
             throw new RemoteServiceUncertainException("Invalid automatic selection response");
         }
         if (operation.equals("reserve") && response.status() == ReservationStatus.RELEASED) {

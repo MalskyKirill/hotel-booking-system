@@ -1,5 +1,6 @@
 package ru.mephi.exception.handler;
 
+import ru.mephi.exception.NoAvailableRoomException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +26,8 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ru.mephi.exception.NoAvailableRoomException.class)
-    public ResponseEntity<Map<String, Object>> handleNoAvailableRoom(ru.mephi.exception.NoAvailableRoomException ex) {
+    @ExceptionHandler(NoAvailableRoomException.class)
+    public ResponseEntity<Map<String, Object>> handleNoAvailableRoom(NoAvailableRoomException ex) {
         return reservationError(HttpStatus.CONFLICT, "NO_AVAILABLE_ROOM", ex);
     }
 

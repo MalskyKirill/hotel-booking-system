@@ -1,5 +1,6 @@
 package ru.mephi.service;
 
+import ru.mephi.exception.RemoteServiceUncertainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,7 @@ public class BookingSagaTransactions {
         Booking booking = bookings.findByIdForUpdate(id).orElseThrow();
         if (!booking.isAutoSelect()) throw new IllegalStateException("Not an automatic selection");
         if (booking.getRoomId() != null && !booking.getRoomId().equals(roomId)) {
-            throw new ru.mephi.exception.RemoteServiceUncertainException("Selected room changed remotely");
+            throw new RemoteServiceUncertainException("Selected room changed remotely");
         }
         if (booking.getStatus() == BookingStatus.PENDING) booking.setRoomId(roomId);
     }

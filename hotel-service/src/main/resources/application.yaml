@@ -26,3 +26,7 @@ spring:
 
 rsa:
     public-key: classpath:keys/public.pem
+
+hotel:
+    auto-selection:
+        candidate-limit: 20

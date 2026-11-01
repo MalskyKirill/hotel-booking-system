@@ -1,5 +1,12 @@
 package ru.mephi.service;
 
+import java.time.LocalDate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Pageable;
+import java.util.Set;
+import ru.mephi.model.ReservationStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.mephi.dto.CreateRoomRequest;
@@ -77,17 +84,17 @@ public class RoomService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> search(Long hotelId, java.time.LocalDate startDate,
-                                     java.time.LocalDate endDate, boolean recommended) {
+    public List<RoomResponse> search(Long hotelId, LocalDate startDate,
+                                     LocalDate endDate, boolean recommended) {
         if (startDate == null || endDate == null || !startDate.isBefore(endDate)) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "A valid startDate/endDate interval is required");
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "A valid startDate/endDate interval is required");
         }
-        var sort = recommended ? org.springframework.data.domain.Sort.by("timesBooked", "id")
-            : org.springframework.data.domain.Sort.unsorted();
+        var sort = recommended ? Sort.by("timesBooked", "id")
+            : Sort.unsorted();
         return roomRepository.findFree(hotelId, startDate, endDate,
-            java.util.Set.of(ru.mephi.model.ReservationStatus.HELD, ru.mephi.model.ReservationStatus.CONFIRMED),
-            org.springframework.data.domain.Pageable.unpaged(sort)).stream().map(this::mapToResponse).toList();
+            Set.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED),
+            Pageable.unpaged(sort)).stream().map(this::mapToResponse).toList();
     }
 
     private RoomResponse mapToResponse(Room room) {

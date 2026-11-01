@@ -14,6 +14,7 @@ import java.util.Set;
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class AutoReservationService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AutoReservationService.class);
     private final AutoReservationTransactions transactions;
     private final RoomRepository rooms;
     private final int candidateLimit;
@@ -35,7 +36,11 @@ public class AutoReservationService {
             PageRequest.of(0, candidateLimit, Sort.by("timesBooked", "id")));
         for (var candidate : candidates) {
             var result = transactions.attempt(request, candidate.getId());
-            if (result != null) return result;
+            if (result != null) {
+                log.info("Auto selection: bookingId={}, roomId={}, status={}", request.bookingId(), result.roomId(), result.status());
+                return result;
+            }
+            log.info("Auto candidate occupied: bookingId={}, roomId={}", request.bookingId(), candidate.getId());
         }
         previous = transactions.inspect(request);
         if (previous != null) return previous;
