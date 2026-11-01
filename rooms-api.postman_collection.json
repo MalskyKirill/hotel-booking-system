@@ -19,6 +19,14 @@
             "key": "roomId",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "startDate",
+            "value": "2027-01-01"
+        },
+        {
+            "key": "endDate",
+            "value": "2027-01-03"
         }
     ],
     "item": [
@@ -55,7 +63,10 @@
             "request": {
                 "method": "POST",
                 "header": [
-                    { "key": "Content-Type", "value": "application/json" }
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
                 ],
                 "body": {
                     "mode": "raw",
@@ -63,8 +74,13 @@
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/rooms",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ]
                 }
             }
         },
@@ -93,7 +109,10 @@
             "request": {
                 "method": "POST",
                 "header": [
-                    { "key": "Content-Type", "value": "application/json" }
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
                 ],
                 "body": {
                     "mode": "raw",
@@ -101,8 +120,13 @@
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/rooms",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ]
                 }
             }
         },
@@ -130,7 +154,10 @@
             "request": {
                 "method": "POST",
                 "header": [
-                    { "key": "Content-Type", "value": "application/json" }
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
                 ],
                 "body": {
                     "mode": "raw",
@@ -138,8 +165,13 @@
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/rooms",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ]
                 }
             }
         },
@@ -169,7 +201,10 @@
             "request": {
                 "method": "POST",
                 "header": [
-                    { "key": "Content-Type", "value": "application/json" }
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
                 ],
                 "body": {
                     "mode": "raw",
@@ -177,8 +212,13 @@
                 },
                 "url": {
                     "raw": "{{baseUrl}}/api/rooms",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"]
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ]
                 }
             }
         },
@@ -212,9 +252,24 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                    "raw": "{{baseUrl}}/api/rooms",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"]
+                    "raw": "{{baseUrl}}/api/rooms?startDate={{startDate}}&endDate={{endDate}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ],
+                    "query": [
+                        {
+                            "key": "startDate",
+                            "value": "{{startDate}}"
+                        },
+                        {
+                            "key": "endDate",
+                            "value": "{{endDate}}"
+                        }
+                    ]
                 }
             }
         },
@@ -248,13 +303,26 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                    "raw": "{{baseUrl}}/api/rooms?hotelId={{hotelId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"],
+                    "raw": "{{baseUrl}}/api/rooms?hotelId={{hotelId}}&startDate={{startDate}}&endDate={{endDate}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ],
                     "query": [
                         {
                             "key": "hotelId",
                             "value": "{{hotelId}}"
+                        },
+                        {
+                            "key": "startDate",
+                            "value": "{{startDate}}"
+                        },
+                        {
+                            "key": "endDate",
+                            "value": "{{endDate}}"
                         }
                     ]
                 }
@@ -285,13 +353,26 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                    "raw": "{{baseUrl}}/api/rooms?hotelId=999999",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms"],
+                    "raw": "{{baseUrl}}/api/rooms?hotelId=999999&startDate={{startDate}}&endDate={{endDate}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms"
+                    ],
                     "query": [
                         {
                             "key": "hotelId",
                             "value": "999999"
+                        },
+                        {
+                            "key": "startDate",
+                            "value": "{{startDate}}"
+                        },
+                        {
+                            "key": "endDate",
+                            "value": "{{endDate}}"
                         }
                     ]
                 }
@@ -346,9 +427,25 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                    "raw": "{{baseUrl}}/api/rooms/recommend",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms", "recommend"]
+                    "raw": "{{baseUrl}}/api/rooms/recommend?startDate={{startDate}}&endDate={{endDate}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms",
+                        "recommend"
+                    ],
+                    "query": [
+                        {
+                            "key": "startDate",
+                            "value": "{{startDate}}"
+                        },
+                        {
+                            "key": "endDate",
+                            "value": "{{endDate}}"
+                        }
+                    ]
                 }
             }
         },
@@ -403,13 +500,27 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                    "raw": "{{baseUrl}}/api/rooms/recommend?hotelId={{hotelId}}",
-                    "host": ["{{baseUrl}}"],
-                    "path": ["api", "rooms", "recommend"],
+                    "raw": "{{baseUrl}}/api/rooms/recommend?hotelId={{hotelId}}&startDate={{startDate}}&endDate={{endDate}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "rooms",
+                        "recommend"
+                    ],
                     "query": [
                         {
                             "key": "hotelId",
                             "value": "{{hotelId}}"
+                        },
+                        {
+                            "key": "startDate",
+                            "value": "{{startDate}}"
+                        },
+                        {
+                            "key": "endDate",
+                            "value": "{{endDate}}"
                         }
                     ]
                 }

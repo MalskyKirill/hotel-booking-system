@@ -22,13 +22,14 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(showSql = false)
-@Import({RoomReservationService.class, RoomReservationTransactions.class})
+@Import({RoomReservationService.class, RoomReservationTransactions.class, RoomService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class RoomReservationConcurrencyTest {
     @Autowired private RoomReservationService service;
     @Autowired private RoomReservationRepository reservations;
     @Autowired private RoomRepository rooms;
     @Autowired private HotelRepository hotels;
+    @Autowired private RoomService roomService;
     private Long roomId;
 
     @BeforeEach
@@ -146,6 +147,27 @@ class RoomReservationConcurrencyTest {
         CreateReservationRequest changed = new CreateReservationRequest(1L, roomId,
             request.startDate(), request.endDate().plusDays(1));
         assertThrows(ru.mephi.exception.IdempotencyConflictException.class, () -> service.release(changed));
+    }
+
+    @Test
+    void dateSearchExcludesHeldAndConfirmedButAllowsReleasedAndAdjacentDates() {
+        var req = request(1L);
+        service.reserve(req);
+        assertTrue(roomService.search(null, req.startDate(), req.endDate(), true).isEmpty());
+        assertEquals(1, roomService.search(null, req.endDate(), req.endDate().plusDays(1), true).size());
+        service.release(1L);
+        assertEquals(roomId, roomService.search(null, req.startDate(), req.endDate(), true).getFirst().getId());
+        service.reserve(request(2L));
+        service.confirm(2L);
+        assertTrue(roomService.search(null, req.startDate(), req.endDate(), false).isEmpty());
+    }
+
+    @Test
+    void searchRejectsEmptyOrReversedDates() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+            () -> roomService.search(null, null, request(1L).endDate(), true));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+            () -> roomService.search(null, request(1L).endDate(), request(1L).startDate(), true));
     }
 
     private CreateReservationRequest request(Long bookingId) {

@@ -116,6 +116,35 @@ class BookingSecurityTest {
             .andExpect(jsonPath("$.id").value(1));
     }
 
+    @Test
+    void automaticRequestIgnoresRoomIdAndAllowsSelectionWithoutIt() throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        when(bookingService.create(any(CreateBookingRequest.class), eq("alice")))
+            .thenReturn(new BookingResponse(1L, 7L, LocalDate.of(2027, 1, 1),
+                LocalDate.of(2027, 1, 2), BookingStatus.CONFIRMED, Instant.now()));
+        mvc.perform(post("/api/bookings").header("Authorization", "Bearer test-token")
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"autoSelect":true,"roomId":-1,"hotelId":5,"startDate":"2027-01-01", "endDate":"2027-01-02","requestId":"auto"}
+                    """))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.roomId").value(7));
+        var capture = org.mockito.ArgumentCaptor.forClass(CreateBookingRequest.class);
+        verify(bookingService).create(capture.capture(), eq("alice"));
+        org.junit.jupiter.api.Assertions.assertNull(capture.getValue().roomId());
+        org.junit.jupiter.api.Assertions.assertTrue(capture.getValue().autoSelect());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"false", "true,\"hotelId\":-1"})
+    void rejectsInvalidSelectionInput(String selection) throws Exception {
+        when(jwtDecoder.decode("test-token")).thenReturn(jwt("USER"));
+        mvc.perform(post("/api/bookings").header("Authorization", "Bearer test-token")
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                    {"autoSelect":%s,"startDate":"2027-01-01","endDate":"2027-01-02","requestId":"auto"}
+                    """.formatted(selection)))
+            .andExpect(status().isBadRequest());
+        verifyNoInteractions(bookingService);
+    }
+
     private Jwt jwt(String role) {
         Jwt.Builder builder = Jwt.withTokenValue("test-token")
             .header("alg", "RS256")

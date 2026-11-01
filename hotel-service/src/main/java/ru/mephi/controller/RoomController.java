@@ -1,5 +1,6 @@
 package ru.mephi.controller;
 
+import java.time.LocalDate;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,13 +30,17 @@ public class RoomController {
     }
 
     @GetMapping
-    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId) {
-        return roomService.getAvailableRooms(hotelId);
+    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId,
+                                      @RequestParam LocalDate startDate,
+                                      @RequestParam LocalDate endDate) {
+        return roomService.search(hotelId, startDate, endDate, false);
     }
 
     @GetMapping("/recommend")
-    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId) {
-        return roomService.getRecommendedRooms(hotelId);
+    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId,
+                                                @RequestParam LocalDate startDate,
+                                                @RequestParam LocalDate endDate) {
+        return roomService.search(hotelId, startDate, endDate, true);
     }
 
 

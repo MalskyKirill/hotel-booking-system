@@ -98,6 +98,15 @@ public class RoomReservationTransactions {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReservationResponse confirm(Long bookingId) {
+        return confirmExisting(bookingId);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ReservationResponse confirmInTransaction(Long bookingId) {
+        return confirmExisting(bookingId);
+    }
+
+    private ReservationResponse confirmExisting(Long bookingId) {
         //  Первичное чтение (чтобы узнать roomId)
         RoomReservation reservation = reservationRepository.findByBookingId(bookingId)
             .orElseThrow(() -> new ReservationNotFoundException(bookingId));
@@ -162,6 +171,15 @@ public class RoomReservationTransactions {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReservationResponse release(Long bookingId) {
+        return releaseExisting(bookingId);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ReservationResponse releaseInTransaction(Long bookingId) {
+        return releaseExisting(bookingId);
+    }
+
+    private ReservationResponse releaseExisting(Long bookingId) {
         // Первичное чтение
         RoomReservation reservation = reservationRepository.findByBookingId(bookingId)
             .orElseThrow(() -> new ReservationNotFoundException(bookingId));

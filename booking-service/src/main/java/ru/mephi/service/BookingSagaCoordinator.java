@@ -34,18 +34,21 @@ public class BookingSagaCoordinator {
         BookingResponse booking = snapshot.booking();
         CreateReservationRequest request = new CreateReservationRequest(id, booking.roomId(), booking.startDate(), booking.endDate());
         log.info("Resume Saga: bookingId={}, requestId={}, compensating={}", id, snapshot.requestId(), snapshot.compensating());
+        AutoReservationRequest auto = snapshot.autoSelect()
+            ? new AutoReservationRequest(id, snapshot.hotelId(), booking.startDate(), booking.endDate()) : null;
         try {
-            if (snapshot.compensating()) return compensate(request);
+            if (snapshot.compensating()) return compensate(request, auto);
             try {
-                ReservationResponse reserved = retry.execute(id, "reserve", () -> hotel.reserve(request));
+                ReservationResponse reserved = retry.execute(id, "reserve", () -> auto == null ? hotel.reserve(request) : hotel.reserveAuto(auto));
+                rememberSelection(auto, reserved);
                 if (reserved.status() == ReservationStatus.HELD) {
-                    retry.execute(id, "confirm", () -> hotel.confirm(request));
+                    retry.execute(id, "confirm", () -> auto == null ? hotel.confirm(request) : hotel.confirmAuto(auto));
                 }
             } catch (RemoteServiceUncertainException | RemoteBusinessConflictException
                      | RemoteRoomNotFoundException | RemoteHotelRequestException ex) {
                 state.beginCompensation(id);
                 log.warn("Begin compensation: bookingId={}, requestId={}", id, snapshot.requestId());
-                return compensate(request);
+                return compensate(request, auto);
             }
             return confirmed(id);
         } catch (RemoteServiceUncertainException | RemoteHotelRequestException
@@ -53,6 +56,10 @@ public class BookingSagaCoordinator {
             log.warn("Defer Saga: bookingId={}, requestId={}, cause={}", id, snapshot.requestId(), ex.getClass().getSimpleName());
             return state.defer(id);
         }
+    }
+
+    private void rememberSelection(AutoReservationRequest request, ReservationResponse response) {
+        if (request != null && response.roomId() != null) state.selectRoom(request.bookingId(), response.roomId());
     }
 
     private BookingResponse confirmed(Long id) {
@@ -67,25 +74,31 @@ public class BookingSagaCoordinator {
         return result;
     }
 
-    private BookingResponse compensate(CreateReservationRequest request) {
+    private BookingResponse compensate(CreateReservationRequest request, AutoReservationRequest auto) {
         Long id = request.bookingId();
         try {
-            ReservationResponse remote = retry.execute(id, "getStatus", () -> hotel.getStatus(request));
+            ReservationResponse remote = retry.execute(id, "getStatus", () -> auto == null ? hotel.getStatus(request) : hotel.getAutoStatus(auto));
+            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
+            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
         } catch (RemoteReservationNotFoundException ignored) {
             // Отсутствие записи не исключает запоздавший reserve: нужен RELEASED-маркер.
         }
         try {
-            retry.execute(id, "release", () -> hotel.release(request));
+            ReservationResponse released = retry.execute(id, "release",
+                () -> auto == null ? hotel.release(request) : hotel.releaseAuto(auto));
+            rememberSelection(auto, released);
             return cancelled(id);
         } catch (RemoteRoomNotFoundException ignored) {
             // Несуществующий номер не может иметь резерв (FK в Hotel).
             return cancelled(id);
         } catch (RemoteBusinessConflictException ex) {
             // confirm мог выиграть гонку с release. Уточняем результат, не отменяем вслепую.
-            ReservationResponse remote = retry.execute(id, "getStatus", () -> hotel.getStatus(request));
+            ReservationResponse remote = retry.execute(id, "getStatus", () -> auto == null ? hotel.getStatus(request) : hotel.getAutoStatus(auto));
+            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.CONFIRMED) return confirmed(id);
+            rememberSelection(auto, remote);
             if (remote.status() == ReservationStatus.RELEASED) return cancelled(id);
             throw ex;
         }
