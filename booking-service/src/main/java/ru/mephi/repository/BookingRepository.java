@@ -16,6 +16,7 @@ import java.time.Instant;
 import org.springframework.data.domain.Pageable;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    boolean existsByUser_Id(Long userId);
     Optional<Booking> findByIdAndUser_Username(Long id, String username);
     Page<Booking> findByUser_Username(String username, Pageable pageable);
     Optional<Booking> findByRequestId(String requestId);
