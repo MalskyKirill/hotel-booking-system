@@ -1,5 +1,6 @@
 package ru.mephi.repository;
 
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,7 @@ public interface RoomReservationRepository extends JpaRepository<RoomReservation
 
     @Query("SELECT r FROM RoomReservation r WHERE r.room.id IN :ids AND r.status IN :statuses " +
         "AND r.startDate < :endDate AND r.endDate > :startDate")
-    java.util.List<RoomReservation> findForStatistics(@Param("ids") java.util.List<Long> ids,
+    List<RoomReservation> findForStatistics(@Param("ids") List<Long> ids,
         @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate,
         @Param("statuses") Collection<ReservationStatus> statuses);
 

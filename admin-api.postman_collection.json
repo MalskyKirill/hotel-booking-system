@@ -1,0 +1,86 @@
+{
+    "info": {
+        "name": "Admin API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{adminToken}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080"
+        },
+        {
+            "key": "adminToken",
+            "value": ""
+        },
+        {
+            "key": "roomId",
+            "value": "1"
+        },
+        {
+            "key": "userId",
+            "value": "1"
+        },
+        {
+            "key": "startDate",
+            "value": "2027-01-01"
+        },
+        {
+            "key": "endDate",
+            "value": "2027-01-08"
+        }
+    ],
+    "item": [
+        {
+            "name": "Все номера",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/admin/rooms"
+            }
+        },
+        {
+            "name": "Статистика",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/admin/rooms/statistics?startDate={{startDate}}&endDate={{endDate}}"
+            }
+        },
+        {
+            "name": "Все пользователи",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/admin/users"
+            }
+        },
+        {
+            "name": "Пользователь",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/admin/users/{{userId}}"
+            }
+        },
+        {
+            "name": "Удалить пользователя без истории",
+            "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/admin/users/{{userId}}"
+            }
+        },
+        {
+            "name": "Удалить номер без истории",
+            "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/admin/rooms/{{roomId}}"
+            }
+        }
+    ]
+}

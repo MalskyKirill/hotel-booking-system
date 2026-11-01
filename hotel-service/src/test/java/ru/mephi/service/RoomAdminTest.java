@@ -68,6 +68,18 @@ class RoomAdminTest {
         assertThrows(ru.mephi.exception.RoomAlreadyExistsException.class,
             () -> admin.update(roomId, new UpdateRoomRequest("2", 1, BigDecimal.TEN, true)));
     }
+    @Test void demoHotelsDoNotOverwriteExistingDataAndAreIdempotent() throws Exception {
+        var seed = new ru.mephi.config.DemoHotelData(hotels, rooms);
+        seed.run(new org.springframework.boot.DefaultApplicationArguments());
+        assertEquals(1, hotels.count()); assertEquals(1, rooms.count());
+        rooms.deleteAll(); hotels.deleteAll();
+        seed.run(new org.springframework.boot.DefaultApplicationArguments());
+        assertEquals(2, hotels.count()); assertEquals(6, rooms.count());
+        assertEquals(4, rooms.findByAvailableTrue().size());
+        seed.run(new org.springframework.boot.DefaultApplicationArguments());
+        assertEquals(6, rooms.count());
+    }
+
     private CreateReservationRequest request() {
         return new CreateReservationRequest(1L, roomId, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 3));
     }

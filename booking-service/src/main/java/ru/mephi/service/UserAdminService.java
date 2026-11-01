@@ -13,7 +13,6 @@ import ru.mephi.dto.*;
 import ru.mephi.exception.UsernameAlreadyExistsException;
 import ru.mephi.model.*;
 import ru.mephi.repository.*;
-import java.util.List;
 
 @Service
 @PreAuthorize("hasRole('ADMIN')")

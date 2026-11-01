@@ -82,6 +82,24 @@ class UserAdminTest {
             assertEquals(1, successes); assertEquals(1, users.countByRole(Role.ADMIN));
         } finally { executor.shutdownNow(); assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS)); }
     }
+    @Test void demoUsersAreIdempotentAndExistingPasswordsAreNotReset() throws Exception {
+        var seed = new ru.mephi.config.DemoUserData(users, encoder,
+            "demo-admin", "TestAdmin123!", "demo-user", "TestUser123!");
+        seed.run(new org.springframework.boot.DefaultApplicationArguments());
+        assertEquals(Role.ADMIN, users.findByUsername("demo-admin").orElseThrow().getRole());
+        String hash = users.findByUsername("demo-admin").orElseThrow().getPassword();
+        assertTrue(encoder.matches("TestAdmin123!", hash));
+        new ru.mephi.config.DemoUserData(users, encoder, "demo-admin", "NewAdminPass123!", "demo-user", "NewUserPass123!")
+            .run(new org.springframework.boot.DefaultApplicationArguments());
+        assertEquals(hash, users.findByUsername("demo-admin").orElseThrow().getPassword());
+        assertEquals(3, users.count());
+    }
+    @Test void demoRequiresExternalPasswords() {
+        var seed = new ru.mephi.config.DemoUserData(users, encoder, "demo-admin", "", "demo-user", "");
+        assertThrows(IllegalArgumentException.class, () -> seed.run(new org.springframework.boot.DefaultApplicationArguments()));
+        assertEquals(1, users.count());
+    }
+
     private boolean demote(CyclicBarrier barrier, String name, Long id) throws Exception {
         authenticate(name, "ADMIN");
         try {
