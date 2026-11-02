@@ -16,7 +16,7 @@ JWT RS256, JPA/Hibernate и отдельные H2 in-memory. Пользоват�
 Вспомогательные модули: [request-context](request-context/README.md),
 [api-support](api-support/README.md), [system-tests](system-tests/README.md).
 [Архитектура](docs/architecture.md) · [ER и словарь БД](docs/data-model.md) ·
-[ADR](docs/adr/README.md).
+[ADR](docs/adr/README.md) · [Проверка готовности](docs/readiness.md).
 
 ## Требования и сборка
 
@@ -159,7 +159,7 @@ wait_http "$BASE_URL/v3/api-docs/hotel"
 Это предотвращает обращение к адресу контейнера при loopback-привязке. Для
 развёртывания на разных машинах задаются реальные доступные адреса экземпляров.
 Для demo интервалы обновления реестра и серверного кэша сокращены до секунды;
-Hotel и Booking запускаются с ожиданием HTTP-готовности перед следующим JVM.
+Hotel и Booking запускаются с ожиданием HTTP-готовности перед следующей JVM.
 При остановке клиенты завершаются до Eureka, чтобы успеть снять регистрацию.
 Eureka распространяет адреса не мгновенно; ранний 503 допустим до готовности
 маршрутов. Ответ 401 Gateway сам по себе не доказывает готовность backend,
@@ -283,12 +283,12 @@ DELETE возвращает 200/CANCELLED либо 202 с cancellationRequested=
 | POST /api/auth/register, /api/auth/login | Регистрация USER и вход, без JWT |
 | POST/GET /api/bookings; GET/DELETE /api/bookings/{id} | Создание, своя история, чтение и отмена; USER/ADMIN |
 | GET /api/hotels и /api/hotels/{id} | Каталог; USER/ADMIN |
-| POST/PUT/DELETE /api/hotels[/{id}] | Отели; ADMIN |
+| POST /api/hotels; PUT/DELETE /api/hotels/{id} | Отели; ADMIN |
 | GET /api/rooms, /api/rooms/recommend | Свободные номера и рекомендации с обязательными датами; USER/ADMIN |
 | POST /api/rooms | Создание номера; ADMIN |
-| /api/admin/rooms[/{id}] | GET/POST/PUT/DELETE номеров; ADMIN |
+| GET/POST /api/admin/rooms; GET/PUT/DELETE /api/admin/rooms/{id} | Номера; ADMIN |
 | GET /api/admin/rooms/statistics | Загрузка за период; ADMIN |
-| /api/admin/users[/{id}] | GET/POST/PATCH/DELETE пользователей; ADMIN |
+| GET/POST /api/admin/users; GET/PATCH/DELETE /api/admin/users/{id} | Пользователи; ADMIN |
 
 Точные тела, фильтры и ограничения удаления: [администрирование](docs/admin-demo.md)
 и [Swagger](docs/openapi.md). Внутренние маршруты и SERVICE JWT клиентскому API
@@ -317,7 +317,7 @@ trap - EXIT
 H2 теряет данные после остановки JVM. Восстановление после потери самой БД,
 распределённый отзыв JWT после смены роли/пароля, горизонтальный HA и production
 SLA не реализованы. Подробнее о решениях: [ADR](docs/adr/README.md),
-о диагностиках — [корреляция и ECS](docs/observability.md).
+о диагностике — [корреляция и ECS](docs/observability.md).
 
 ## Тесты и стиль
 
