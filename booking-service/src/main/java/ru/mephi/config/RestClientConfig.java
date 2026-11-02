@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import ru.mephi.service.JwtService;
+import ru.mephi.observability.TracePropagationInterceptor;
 
 @Configuration
 public class RestClientConfig {
@@ -48,6 +49,7 @@ public class RestClientConfig {
         return loadBalancedBuilder
             .baseUrl("http://hotel-service")
             .requestFactory(factory)
+            .requestInterceptor(new TracePropagationInterceptor())
             .requestInterceptor((request, body, execution) -> {
                 String token = jwtService.generateServiceToken();
                 request.getHeaders().add("Authorization", "Bearer " + token);

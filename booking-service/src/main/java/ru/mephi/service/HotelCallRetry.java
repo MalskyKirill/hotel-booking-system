@@ -15,23 +15,37 @@ public class HotelCallRetry {
     private final int attempts;
     private final long initialDelay;
     private final Sleeper sleeper;
+    private final HotelCircuitBreaker circuit;
 
     @Autowired
     public HotelCallRetry(@Value("${booking.saga.remote.max-attempts:3}") int attempts,
-                          @Value("${booking.saga.remote.initial-delay-ms:100}") long initialDelay) {
-        this(attempts, initialDelay, Thread::sleep);
+                          @Value("${booking.saga.remote.initial-delay-ms:100}") long initialDelay,
+                          HotelCircuitBreaker circuit) {
+        this(attempts, initialDelay, Thread::sleep, circuit);
     }
 
+    public HotelCallRetry(int attempts, long initialDelay) {
+        this(attempts, initialDelay, Thread::sleep, null);
+    }
     HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper) {
+        this(attempts, initialDelay, sleeper, null);
+    }
+    HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper, HotelCircuitBreaker circuit) {
         if (attempts < 1 || attempts > 10 || initialDelay < 0 || initialDelay > 2000) {
             throw new IllegalArgumentException("Invalid Saga retry limits");
         }
         this.attempts = attempts;
         this.initialDelay = initialDelay;
         this.sleeper = sleeper;
+        this.circuit = circuit;
     }
 
     public <T> T execute(Long bookingId, String operation, Supplier<T> action) {
+        return circuit == null ? withRetry(bookingId, operation, action)
+            : circuit.execute(bookingId, operation, () -> withRetry(bookingId, operation, action));
+    }
+
+    private <T> T withRetry(Long bookingId, String operation, Supplier<T> action) {
         for (int attempt = 1; ; attempt++) {
             try {
                 return action.get();

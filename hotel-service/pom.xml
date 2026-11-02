@@ -13,6 +13,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.hotelbooking</groupId>
+            <artifactId>request-context</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>

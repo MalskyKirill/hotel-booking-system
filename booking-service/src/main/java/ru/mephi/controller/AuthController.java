@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,8 +14,6 @@ import ru.mephi.dto.LoginRequest;
 import ru.mephi.dto.RegisterRequest;
 import ru.mephi.dto.UserResponse;
 import ru.mephi.service.AuthService;
-
-import java.net.URI;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,7 +29,7 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse res = authService.register(request);
 
-        return ResponseEntity.created(URI.create("/api/users/" + res.id())).body(res);
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 
     @PostMapping("/login")

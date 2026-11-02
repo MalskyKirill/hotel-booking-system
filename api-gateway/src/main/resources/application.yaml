@@ -80,3 +80,8 @@ springdoc:
               url: /v3/api-docs/booking
             - name: Hotel Service
               url: /v3/api-docs/hotel
+
+logging:
+    structured:
+        format:
+            console: ecs
