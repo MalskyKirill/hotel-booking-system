@@ -162,6 +162,23 @@ class AutoReservationTest {
     assertThrows(InvalidReservationStateException.class, () -> service.confirm(request));
   }
 
+  @Test
+  void repeatedNonOverlappingStaysKeepEqualRoomsEvenlyUsed() {
+    LocalDate start = LocalDate.of(2027, 2, 1);
+    for (int i = 0; i < 20; i++) {
+      var request =
+          new AutoReservationRequest(1000L + i, hotelId, start.plusDays(i), start.plusDays(i + 1));
+      var selected = service.reserve(request);
+      assertEquals(ids.get(i % ids.size()), selected.roomId());
+      service.confirm(request);
+      service.confirm(request);
+      List<Integer> counts = rooms.findAllById(ids).stream().map(Room::getTimesBooked).toList();
+      assertTrue(Collections.max(counts) - Collections.min(counts) <= 1);
+    }
+    assertTrue(rooms.findAllById(ids).stream().allMatch(room -> room.getTimesBooked() == 10));
+    assertEquals(20, reservations.count());
+  }
+
   private AutoReservationRequest request(Long id) {
     return new AutoReservationRequest(
         id, hotelId, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 3));

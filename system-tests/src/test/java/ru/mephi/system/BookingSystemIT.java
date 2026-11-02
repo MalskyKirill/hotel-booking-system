@@ -120,8 +120,8 @@ class BookingSystemIT {
   }
 
   private List<LiveStack.Response> burst(List<Map<String, Object>> requests) throws Exception {
-    CyclicBarrier barrier = new CyclicBarrier(8);
-    try (ExecutorService executor = Executors.newFixedThreadPool(8)) {
+    CyclicBarrier barrier = new CyclicBarrier(requests.size());
+    try (ExecutorService executor = Executors.newFixedThreadPool(requests.size())) {
       List<Future<LiveStack.Response>> results = new ArrayList<>();
       for (var request : requests)
         results.add(
@@ -156,12 +156,13 @@ class BookingSystemIT {
     return s.settled(response.body().path("id").asLong(), null);
   }
 
-  @Test
-  void concurrentRepeatedKeyCreatesOneBooking() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void concurrentRepeatedKeyCreatesOneBooking(boolean automatic) throws Exception {
     var fixture = s.fixture(1);
-    var request = s.booking(fixture, false);
+    var request = s.booking(fixture, automatic);
     Set<Long> ids = new HashSet<>();
-    for (var response : burst(Collections.nCopies(8, request))) {
+    for (var response : burst(Collections.nCopies(32, request))) {
       JsonNode booking = outcome(response);
       ids.add(booking.path("id").asLong());
       assertEquals("CONFIRMED", booking.path("status").asText());
@@ -200,7 +201,7 @@ class BookingSystemIT {
     return s.get(
             "/api/admin/rooms/statistics?hotelId="
                 + hotel
-                + "&startDate=2027-01-01&endDate=2027-01-03",
+                + "&startDate=2027-01-01&endDate=2027-01-03&size=100",
             s.admin)
         .require(200)
         .path("content");
@@ -246,6 +247,76 @@ class BookingSystemIT {
       active += stat.path("confirmedReservations").asInt();
     }
     assertEquals(3, active);
+  }
+
+  @Test
+  @Timeout(180)
+  void repeatedConcurrentWavesUseAllRoomsBeyondCandidateBatchWithoutIdleSlots() throws Exception {
+    int parallelism = 32;
+    int rounds = 3;
+    var fixture = s.fixture(parallelism + 1);
+    long unavailable = fixture.rooms().getLast();
+    s.call(
+            "/api/admin/rooms/" + unavailable,
+            "PUT",
+            Map.of("roomNumber", "33", "capacity", 2, "price", 100, "available", false),
+            s.admin)
+        .require(200);
+    Set<Long> available = new HashSet<>(fixture.rooms().subList(0, parallelism));
+    Set<Long> allBookings = new HashSet<>();
+    long started = System.nanoTime();
+
+    for (int round = 1; round <= rounds; round++) {
+      List<Map<String, Object>> requests = new ArrayList<>();
+      for (int i = 0; i < parallelism; i++) requests.add(s.booking(fixture, true));
+      List<LiveStack.Response> responses = burst(requests);
+      List<Long> ids = new ArrayList<>();
+      Set<Long> selected = new HashSet<>();
+      for (int i = 0; i < responses.size(); i++) {
+        JsonNode booking = outcome(responses.get(i));
+        assertEquals("CONFIRMED", booking.path("status").asText(), "A free room was left idle");
+        long id = booking.path("id").asLong();
+        assertTrue(allBookings.add(id));
+        ids.add(id);
+        assertTrue(
+            selected.add(booking.path("roomId").asLong()),
+            "Room booked twice for overlapping dates");
+        assertEquals("CONFIRMED", s.remote(id, requests.get(i)).path("status").asText());
+      }
+      assertEquals(available, selected);
+      assertTrue(s.search(fixture.hotel(), false).isEmpty());
+      for (int i = 0; i < 8; i++) {
+        assertEquals(
+            ids.get(i).longValue(), s.create(requests.get(i)).require(200).path("id").asLong());
+      }
+      assertWaveStatistics(fixture.hotel(), round, true);
+      for (int i = 0; i < ids.size(); i++) {
+        var cancelled = s.call("/api/bookings/" + ids.get(i), "DELETE", null, s.user);
+        assertTrue(cancelled.status() == 200 || cancelled.status() == 202);
+        s.settled(ids.get(i), "CANCELLED");
+        assertEquals("RELEASED", s.remote(ids.get(i), requests.get(i)).path("status").asText());
+      }
+      assertWaveStatistics(fixture.hotel(), round, false);
+      assertEquals(parallelism, s.search(fixture.hotel(), false).size());
+    }
+    assertEquals(parallelism * rounds, allBookings.size());
+    System.out.printf(
+        "Auto-selection verification: rounds=%d, parallelism=%d, confirmed=%d, elapsedMs=%d%n",
+        rounds,
+        parallelism,
+        allBookings.size(),
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+  }
+
+  private void assertWaveStatistics(long hotel, int round, boolean occupied) throws Exception {
+    JsonNode stats = statistics(hotel);
+    assertEquals(33, stats.size());
+    for (JsonNode row : stats) {
+      boolean available = row.path("available").asBoolean();
+      assertEquals(0, row.path("heldReservations").asInt());
+      assertEquals(available && occupied ? 1 : 0, row.path("confirmedReservations").asInt());
+      assertEquals(available ? round : 0, row.path("timesBooked").asInt());
+    }
   }
 
   @Test

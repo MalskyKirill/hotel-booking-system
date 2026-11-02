@@ -43,27 +43,42 @@ public class AutoReservationService {
     ensure(request);
     var previous = transactions.inspect(request);
     if (previous != null) return previous;
-    var candidates =
-        rooms.findFree(
-            request.hotelId(),
-            request.startDate(),
-            request.endDate(),
-            Set.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED),
-            PageRequest.of(0, candidateLimit, Sort.by("timesBooked", "id")));
-    for (var candidate : candidates) {
-      var result = transactions.attempt(request, candidate.getId());
-      if (result != null) {
+    // Bound the scan by the initial catalog size even if rooms/counters change concurrently.
+    long remaining =
+        request.hotelId() == null ? rooms.count() : rooms.countByHotel_Id(request.hotelId());
+    Integer afterTimesBooked = null;
+    Long afterId = null;
+    while (remaining > 0) {
+      var candidates =
+          rooms.findFreeAfter(
+              request.hotelId(),
+              request.startDate(),
+              request.endDate(),
+              Set.of(ReservationStatus.HELD, ReservationStatus.CONFIRMED),
+              afterTimesBooked,
+              afterId,
+              PageRequest.of(
+                  0, (int) Math.min(candidateLimit, remaining), Sort.by("timesBooked", "id")));
+      if (candidates.isEmpty()) break;
+      for (var candidate : candidates) {
+        remaining--;
+        // A keyset cursor avoids skipping free rooms when earlier candidates become occupied.
+        afterTimesBooked = candidate.getTimesBooked();
+        afterId = candidate.getId();
+        var result = transactions.attempt(request, candidate.getId());
+        if (result != null) {
+          log.info(
+              "Auto selection: bookingId={}, roomId={}, status={}",
+              request.bookingId(),
+              result.roomId(),
+              result.status());
+          return result;
+        }
         log.info(
-            "Auto selection: bookingId={}, roomId={}, status={}",
+            "Auto candidate occupied: bookingId={}, roomId={}",
             request.bookingId(),
-            result.roomId(),
-            result.status());
-        return result;
+            candidate.getId());
       }
-      log.info(
-          "Auto candidate occupied: bookingId={}, roomId={}",
-          request.bookingId(),
-          candidate.getId());
     }
     previous = transactions.inspect(request);
     if (previous != null) return previous;

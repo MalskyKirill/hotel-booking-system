@@ -19,6 +19,8 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
   List<Room> findByHotel_Id(Long hotelId);
 
+  long countByHotel_Id(Long hotelId);
+
   boolean existsByHotelId(Long hotelId);
 
   boolean existsByHotel_IdAndRoomNumber(Long hotelId, String roomNumber);
@@ -34,14 +36,27 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
   @Query(
       "SELECT r FROM Room r WHERE r.available = true "
           + "AND (:hotelId IS NULL OR r.hotel.id = :hotelId) "
+          + "AND (:afterTimesBooked IS NULL OR r.timesBooked > :afterTimesBooked "
+          + "OR (r.timesBooked = :afterTimesBooked AND r.id > :afterId)) "
           + "AND NOT EXISTS (SELECT x.id FROM RoomReservation x WHERE x.room = r "
           + "AND x.status IN :statuses AND x.startDate < :endDate AND x.endDate > :startDate)")
-  List<Room> findFree(
+  List<Room> findFreeAfter(
       @Param("hotelId") Long hotelId,
       @Param("startDate") LocalDate startDate,
       @Param("endDate") LocalDate endDate,
       @Param("statuses") Collection<ReservationStatus> statuses,
+      @Param("afterTimesBooked") Integer afterTimesBooked,
+      @Param("afterId") Long afterId,
       Pageable pageable);
+
+  default List<Room> findFree(
+      Long hotelId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Collection<ReservationStatus> statuses,
+      Pageable pageable) {
+    return findFreeAfter(hotelId, startDate, endDate, statuses, null, null, pageable);
+  }
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT r FROM Room r WHERE r.id = :id")
