@@ -40,3 +40,6 @@ build/
 .idea/
 keys/private.pem
 **/keys/private.pem
+
+# Generated local Postman demo credentials, keys, logs and environment.
+/.local/
