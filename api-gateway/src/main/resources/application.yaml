@@ -85,3 +85,8 @@ logging:
     structured:
         format:
             console: ecs
+
+# Override with RSA_PUBLIC_KEY or --rsa.public-key=file:/absolute/path/public.pem.
+# Only a public key is needed; the private key remains in Booking.
+rsa:
+    public-key: file:keys/public.pem

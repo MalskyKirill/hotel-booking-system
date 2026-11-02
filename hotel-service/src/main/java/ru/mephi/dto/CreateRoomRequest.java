@@ -3,54 +3,54 @@ package ru.mephi.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-
 import java.math.BigDecimal;
 
 public class CreateRoomRequest {
-    @NotNull(message = "Hotel ID must be provided")
-    private Long hotelId;
-    @NotBlank(message = "Room number must not be blank")
-    private String roomNumber;
-    @NotNull(message = "Capacity must be provided")
-    @Positive(message = "Capacity must be greater than zero")
-    private Integer capacity;
+  @NotNull(message = "Hotel ID must be provided")
+  private Long hotelId;
 
-    @NotNull(message = "Price must be provided")
-    @Positive(message = "Price must be greater than zero")
-    private BigDecimal price;
+  @NotBlank(message = "Room number must not be blank")
+  private String roomNumber;
 
-    public CreateRoomRequest() {
-    }
+  @NotNull(message = "Capacity must be provided")
+  @Positive(message = "Capacity must be greater than zero")
+  private Integer capacity;
 
-    public Long getHotelId() {
-        return hotelId;
-    }
+  @NotNull(message = "Price must be provided")
+  @Positive(message = "Price must be greater than zero")
+  private BigDecimal price;
 
-    public void setHotelId(Long hotelId) {
-        this.hotelId = hotelId;
-    }
+  public CreateRoomRequest() {}
 
-    public String getRoomNumber() {
-        return roomNumber;
-    }
+  public Long getHotelId() {
+    return hotelId;
+  }
 
-    public void setRoomNumber(String roomNumber) {
-        this.roomNumber = roomNumber;
-    }
+  public void setHotelId(Long hotelId) {
+    this.hotelId = hotelId;
+  }
 
-    public Integer getCapacity() {
-        return capacity;
-    }
+  public String getRoomNumber() {
+    return roomNumber;
+  }
 
-    public void setCapacity(Integer capacity) {
-        this.capacity = capacity;
-    }
+  public void setRoomNumber(String roomNumber) {
+    this.roomNumber = roomNumber;
+  }
 
-    public BigDecimal getPrice() {
-        return price;
-    }
+  public Integer getCapacity() {
+    return capacity;
+  }
 
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
+  public void setCapacity(Integer capacity) {
+    this.capacity = capacity;
+  }
+
+  public BigDecimal getPrice() {
+    return price;
+  }
+
+  public void setPrice(BigDecimal price) {
+    this.price = price;
+  }
 }

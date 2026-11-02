@@ -1,7 +1,7 @@
 package ru.mephi.dto;
 
 public enum ReservationStatus {
-    HELD,
-    CONFIRMED,
-    RELEASED
+  HELD,
+  CONFIRMED,
+  RELEASED
 }

@@ -1,50 +1,47 @@
 package ru.mephi.controller;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-
-import java.time.LocalDate;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.mephi.dto.CreateRoomRequest;
 import ru.mephi.dto.RoomResponse;
 import ru.mephi.service.RoomService;
 
-import java.net.URI;
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomController {
 
-    private final RoomService roomService;
+  private final RoomService roomService;
 
-    public RoomController(RoomService roomService) {
-        this.roomService = roomService;
-    }
+  public RoomController(RoomService roomService) {
+    this.roomService = roomService;
+  }
 
-    @PostMapping
-    @ApiResponse(responseCode = "201", description = "Ресурс создан")
-    public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest req) {
-        RoomResponse res = roomService.create(req);
+  @PostMapping
+  @ApiResponse(responseCode = "201", description = "Ресурс создан")
+  public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest req) {
+    RoomResponse res = roomService.create(req);
 
-        return ResponseEntity.created(URI.create("/api/rooms/" + res.getId()))
-            .body(res);
-    }
+    return ResponseEntity.created(URI.create("/api/rooms/" + res.getId())).body(res);
+  }
 
-    @GetMapping
-    public List<RoomResponse> getRooms(@RequestParam(required = false) Long hotelId,
-                                      @RequestParam LocalDate startDate,
-                                      @RequestParam LocalDate endDate) {
-        return roomService.search(hotelId, startDate, endDate, false);
-    }
+  @GetMapping
+  public List<RoomResponse> getRooms(
+      @RequestParam(required = false) Long hotelId,
+      @RequestParam LocalDate startDate,
+      @RequestParam LocalDate endDate) {
+    return roomService.search(hotelId, startDate, endDate, false);
+  }
 
-    @GetMapping("/recommend")
-    public List<RoomResponse> getRecommendations(@RequestParam(required = false) Long hotelId,
-                                                @RequestParam LocalDate startDate,
-                                                @RequestParam LocalDate endDate) {
-        return roomService.search(hotelId, startDate, endDate, true);
-    }
-
-
+  @GetMapping("/recommend")
+  public List<RoomResponse> getRecommendations(
+      @RequestParam(required = false) Long hotelId,
+      @RequestParam LocalDate startDate,
+      @RequestParam LocalDate endDate) {
+    return roomService.search(hotelId, startDate, endDate, true);
+  }
 }

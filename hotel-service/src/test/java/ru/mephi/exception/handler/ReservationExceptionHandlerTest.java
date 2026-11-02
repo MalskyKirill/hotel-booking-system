@@ -1,5 +1,15 @@
 package ru.mephi.exception.handler;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,88 +28,87 @@ import ru.mephi.exception.RoomNotFoundException;
 import ru.mephi.exception.RoomUnavailableException;
 import ru.mephi.service.RoomReservationService;
 
-import java.util.stream.Stream;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 class ReservationExceptionHandlerTest {
 
-    private RoomReservationService service;
-    private MockMvc mvc;
+  private RoomReservationService service;
+  private MockMvc mvc;
 
-    @BeforeEach
-    void setUp() {
-        service = mock(RoomReservationService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new RoomReservationController(service))
+  @BeforeEach
+  void setUp() {
+    service = mock(RoomReservationService.class);
+    mvc =
+        MockMvcBuilders.standaloneSetup(new RoomReservationController(service))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
-    }
+  }
 
-    @ParameterizedTest
-    @MethodSource("reservationErrors")
-    void returnsBusinessStatusAndCode(RuntimeException exception, int expectedStatus, String expectedCode)
-        throws Exception {
-        when(service.reserve(any(CreateReservationRequest.class))).thenThrow(exception);
+  @ParameterizedTest
+  @MethodSource("reservationErrors")
+  void returnsBusinessStatusAndCode(
+      RuntimeException exception, int expectedStatus, String expectedCode) throws Exception {
+    when(service.reserve(any(CreateReservationRequest.class))).thenThrow(exception);
 
-        mvc.perform(post("/internal/reservations")
+    mvc.perform(
+            post("/internal/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(
+                    """
                     {"bookingId":1,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-02"}
                     """))
-            .andExpect(status().is(expectedStatus))
-            .andExpect(jsonPath("$.status").value(expectedStatus))
-            .andExpect(jsonPath("$.code").value(expectedCode))
-            .andExpect(jsonPath("$.message").value(exception.getMessage()))
-            .andExpect(jsonPath("$.timestamp").isNotEmpty());
-    }
+        .andExpect(status().is(expectedStatus))
+        .andExpect(jsonPath("$.status").value(expectedStatus))
+        .andExpect(jsonPath("$.code").value(expectedCode))
+        .andExpect(jsonPath("$.message").value(exception.getMessage()))
+        .andExpect(jsonPath("$.timestamp").isNotEmpty());
+  }
 
-    @Test
-    void compensationPassesOriginalReservationParameters() throws Exception {
-        mvc.perform(post("/internal/reservations/1/release")
+  @Test
+  void compensationPassesOriginalReservationParameters() throws Exception {
+    mvc.perform(
+            post("/internal/reservations/1/release")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(
+                    """
                     {"bookingId":1,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-02"}
                     """))
-            .andExpect(status().isOk());
-        verify(service).release(new CreateReservationRequest(1L, 2L,
-            java.time.LocalDate.of(2027, 1, 1), java.time.LocalDate.of(2027, 1, 2)));
-    }
+        .andExpect(status().isOk());
+    verify(service)
+        .release(
+            new CreateReservationRequest(
+                1L, 2L, java.time.LocalDate.of(2027, 1, 1), java.time.LocalDate.of(2027, 1, 2)));
+  }
 
-    @Test
-    void compensationRejectsDifferentBookingId() throws Exception {
-        mvc.perform(post("/internal/reservations/1/release")
+  @Test
+  void compensationRejectsDifferentBookingId() throws Exception {
+    mvc.perform(
+            post("/internal/reservations/1/release")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+                .content(
+                    """
                     {"bookingId":9,"roomId":2,"startDate":"2027-01-01","endDate":"2027-01-02"}
                     """))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
-        verifyNoInteractions(service);
-    }
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
+    verifyNoInteractions(service);
+  }
 
-    @Test
-    void compensationRequiresOriginalParameters() throws Exception {
-        mvc.perform(post("/internal/reservations/1/release"))
-            .andExpect(status().isBadRequest());
-        verifyNoInteractions(service);
-    }
+  @Test
+  void compensationRequiresOriginalParameters() throws Exception {
+    mvc.perform(post("/internal/reservations/1/release")).andExpect(status().isBadRequest());
+    verifyNoInteractions(service);
+  }
 
-    static Stream<Arguments> reservationErrors() {
-        return Stream.of(
-            Arguments.of(new RoomNotFoundException(2L), 404, "ROOM_NOT_FOUND"),
-            Arguments.of(new ReservationNotFoundException(1L), 404, "RESERVATION_NOT_FOUND"),
-            Arguments.of(new ReservationConflictException(2L, "Dates overlap"), 409, "RESERVATION_CONFLICT"),
-            Arguments.of(new RoomUnavailableException(2L), 409, "ROOM_UNAVAILABLE"),
-            Arguments.of(new IdempotencyConflictException(1L), 409, "IDEMPOTENCY_CONFLICT"),
-            Arguments.of(new InvalidReservationStateException(1L, "Already confirmed"),
-                409, "INVALID_RESERVATION_STATE")
-        );
-    }
+  static Stream<Arguments> reservationErrors() {
+    return Stream.of(
+        Arguments.of(new RoomNotFoundException(2L), 404, "ROOM_NOT_FOUND"),
+        Arguments.of(new ReservationNotFoundException(1L), 404, "RESERVATION_NOT_FOUND"),
+        Arguments.of(
+            new ReservationConflictException(2L, "Dates overlap"), 409, "RESERVATION_CONFLICT"),
+        Arguments.of(new RoomUnavailableException(2L), 409, "ROOM_UNAVAILABLE"),
+        Arguments.of(new IdempotencyConflictException(1L), 409, "IDEMPOTENCY_CONFLICT"),
+        Arguments.of(
+            new InvalidReservationStateException(1L, "Already confirmed"),
+            409,
+            "INVALID_RESERVATION_STATE"));
+  }
 }

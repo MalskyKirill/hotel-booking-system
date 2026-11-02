@@ -1,5 +1,6 @@
 package ru.mephi.service;
 
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,67 +8,73 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.mephi.exception.RemoteServiceUncertainException;
 
-import java.util.function.Supplier;
-
 @Component
 public class HotelCallRetry {
-    private static final Logger log = LoggerFactory.getLogger(HotelCallRetry.class);
-    private final int attempts;
-    private final long initialDelay;
-    private final Sleeper sleeper;
-    private final HotelCircuitBreaker circuit;
+  private static final Logger log = LoggerFactory.getLogger(HotelCallRetry.class);
+  private final int attempts;
+  private final long initialDelay;
+  private final Sleeper sleeper;
+  private final HotelCircuitBreaker circuit;
 
-    @Autowired
-    public HotelCallRetry(@Value("${booking.saga.remote.max-attempts:3}") int attempts,
-                          @Value("${booking.saga.remote.initial-delay-ms:100}") long initialDelay,
-                          HotelCircuitBreaker circuit) {
-        this(attempts, initialDelay, Thread::sleep, circuit);
-    }
+  @Autowired
+  public HotelCallRetry(
+      @Value("${booking.saga.remote.max-attempts:3}") int attempts,
+      @Value("${booking.saga.remote.initial-delay-ms:100}") long initialDelay,
+      HotelCircuitBreaker circuit) {
+    this(attempts, initialDelay, Thread::sleep, circuit);
+  }
 
-    public HotelCallRetry(int attempts, long initialDelay) {
-        this(attempts, initialDelay, Thread::sleep, null);
+  public HotelCallRetry(int attempts, long initialDelay) {
+    this(attempts, initialDelay, Thread::sleep, null);
+  }
+
+  HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper) {
+    this(attempts, initialDelay, sleeper, null);
+  }
+
+  HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper, HotelCircuitBreaker circuit) {
+    if (attempts < 1 || attempts > 10 || initialDelay < 0 || initialDelay > 2000) {
+      throw new IllegalArgumentException("Invalid Saga retry limits");
     }
-    HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper) {
-        this(attempts, initialDelay, sleeper, null);
-    }
-    HotelCallRetry(int attempts, long initialDelay, Sleeper sleeper, HotelCircuitBreaker circuit) {
-        if (attempts < 1 || attempts > 10 || initialDelay < 0 || initialDelay > 2000) {
-            throw new IllegalArgumentException("Invalid Saga retry limits");
+    this.attempts = attempts;
+    this.initialDelay = initialDelay;
+    this.sleeper = sleeper;
+    this.circuit = circuit;
+  }
+
+  public <T> T execute(Long bookingId, String operation, Supplier<T> action) {
+    return circuit == null
+        ? withRetry(bookingId, operation, action)
+        : circuit.execute(bookingId, operation, () -> withRetry(bookingId, operation, action));
+  }
+
+  private <T> T withRetry(Long bookingId, String operation, Supplier<T> action) {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        return action.get();
+      } catch (RemoteServiceUncertainException ex) {
+        if (attempt == attempts) {
+          throw ex;
         }
-        this.attempts = attempts;
-        this.initialDelay = initialDelay;
-        this.sleeper = sleeper;
-        this.circuit = circuit;
-    }
-
-    public <T> T execute(Long bookingId, String operation, Supplier<T> action) {
-        return circuit == null ? withRetry(bookingId, operation, action)
-            : circuit.execute(bookingId, operation, () -> withRetry(bookingId, operation, action));
-    }
-
-    private <T> T withRetry(Long bookingId, String operation, Supplier<T> action) {
-        for (int attempt = 1; ; attempt++) {
-            try {
-                return action.get();
-            } catch (RemoteServiceUncertainException ex) {
-                if (attempt == attempts) {
-                    throw ex;
-                }
-                long delay = Math.min(2000, initialDelay * (1L << (attempt - 1)));
-                log.warn("Retry Hotel: bookingId={}, operation={}, attempt={}, delayMs={}",
-                    bookingId, operation, attempt, delay);
-                try {
-                    sleeper.sleep(delay);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    throw new RemoteServiceUncertainException("Saga retry interrupted", interrupted);
-                }
-            }
+        long delay = Math.min(2000, initialDelay * (1L << (attempt - 1)));
+        log.warn(
+            "Retry Hotel: bookingId={}, operation={}, attempt={}, delayMs={}",
+            bookingId,
+            operation,
+            attempt,
+            delay);
+        try {
+          sleeper.sleep(delay);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new RemoteServiceUncertainException("Saga retry interrupted", interrupted);
         }
+      }
     }
+  }
 
-    @FunctionalInterface
-    interface Sleeper {
-        void sleep(long milliseconds) throws InterruptedException;
-    }
+  @FunctionalInterface
+  interface Sleeper {
+    void sleep(long milliseconds) throws InterruptedException;
+  }
 }

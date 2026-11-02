@@ -1,125 +1,170 @@
 package ru.mephi.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.Instant;
 import java.time.LocalDate;
+import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(indexes = @Index(name = "idx_booking_saga_due", columnList = "status,saga_next_attempt_at,id"))
+@Table(
+    indexes = @Index(name = "idx_booking_saga_due", columnList = "status,saga_next_attempt_at,id"))
 public class Booking {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-    @Column(name = "room_id")
-    private Long roomId;
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
-    @Column(name = "end_date", nullable = false)
-    private LocalDate endDate;
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private BookingStatus status;
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "request_id", nullable = false, unique = true)
-    private String requestId;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "user_id", nullable = false)
+  private User user;
 
-    @Column(nullable = false) private boolean cancellationRequested;
-    public boolean isCancellationRequested() { return cancellationRequested; }
-    public void setCancellationRequested(boolean value) { cancellationRequested = value; }
+  @Column(name = "room_id")
+  private Long roomId;
 
-    @Column(nullable = false) private boolean autoSelect;
-    private Long hotelId;
-    public boolean isAutoSelect() { return autoSelect; }
-    public void setAutoSelect(boolean value) { autoSelect = value; }
-    public Long getHotelId() { return hotelId; }
-    public void setHotelId(Long value) { hotelId = value; }
+  @Column(name = "start_date", nullable = false)
+  private LocalDate startDate;
 
-    @Column(nullable = false)
-    private boolean sagaCompensating;
-    @Column(nullable = false)
-    private Instant sagaNextAttemptAt = Instant.now().plusSeconds(30);
-    @Column(nullable = false)
-    private int sagaRecoveryAttempts;
+  @Column(name = "end_date", nullable = false)
+  private LocalDate endDate;
 
-    public boolean isSagaCompensating() { return sagaCompensating; }
-    public void setSagaCompensating(boolean value) { sagaCompensating = value; }
-    public Instant getSagaNextAttemptAt() { return sagaNextAttemptAt; }
-    public void setSagaNextAttemptAt(Instant value) { sagaNextAttemptAt = value; }
-    public int getSagaRecoveryAttempts() { return sagaRecoveryAttempts; }
-    public void setSagaRecoveryAttempts(int value) { sagaRecoveryAttempts = value; }
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false)
+  private BookingStatus status;
 
-    public String getRequestId() {
-        return requestId;
-    }
+  @CreationTimestamp
+  @Column(name = "created_at", nullable = false)
+  private Instant createdAt;
 
-    public void setRequestId(String requestId) {
-        this.requestId = requestId;
-    }
+  @Column(name = "request_id", nullable = false, unique = true)
+  private String requestId;
 
-    public Booking() {
-    }
+  @Column(nullable = false)
+  private boolean cancellationRequested;
 
-    public Long getId() {
-        return id;
-    }
+  public boolean isCancellationRequested() {
+    return cancellationRequested;
+  }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public void setCancellationRequested(boolean value) {
+    cancellationRequested = value;
+  }
 
-    public User getUser() {
-        return user;
-    }
+  @Column(nullable = false)
+  private boolean autoSelect;
 
-    public void setUser(User user) {
-        this.user = user;
-    }
+  private Long hotelId;
 
-    public Long getRoomId() {
-        return roomId;
-    }
+  public boolean isAutoSelect() {
+    return autoSelect;
+  }
 
-    public void setRoomId(Long roomId) {
-        this.roomId = roomId;
-    }
+  public void setAutoSelect(boolean value) {
+    autoSelect = value;
+  }
 
-    public LocalDate getStartDate() {
-        return startDate;
-    }
+  public Long getHotelId() {
+    return hotelId;
+  }
 
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
-    }
+  public void setHotelId(Long value) {
+    hotelId = value;
+  }
 
-    public LocalDate getEndDate() {
-        return endDate;
-    }
+  @Column(nullable = false)
+  private boolean sagaCompensating;
 
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
-    }
+  @Column(nullable = false)
+  private Instant sagaNextAttemptAt = Instant.now().plusSeconds(30);
 
-    public BookingStatus getStatus() {
-        return status;
-    }
+  @Column(nullable = false)
+  private int sagaRecoveryAttempts;
 
-    public void setStatus(BookingStatus status) {
-        this.status = status;
-    }
+  public boolean isSagaCompensating() {
+    return sagaCompensating;
+  }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+  public void setSagaCompensating(boolean value) {
+    sagaCompensating = value;
+  }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
+  public Instant getSagaNextAttemptAt() {
+    return sagaNextAttemptAt;
+  }
+
+  public void setSagaNextAttemptAt(Instant value) {
+    sagaNextAttemptAt = value;
+  }
+
+  public int getSagaRecoveryAttempts() {
+    return sagaRecoveryAttempts;
+  }
+
+  public void setSagaRecoveryAttempts(int value) {
+    sagaRecoveryAttempts = value;
+  }
+
+  public String getRequestId() {
+    return requestId;
+  }
+
+  public void setRequestId(String requestId) {
+    this.requestId = requestId;
+  }
+
+  public Booking() {}
+
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
+
+  public User getUser() {
+    return user;
+  }
+
+  public void setUser(User user) {
+    this.user = user;
+  }
+
+  public Long getRoomId() {
+    return roomId;
+  }
+
+  public void setRoomId(Long roomId) {
+    this.roomId = roomId;
+  }
+
+  public LocalDate getStartDate() {
+    return startDate;
+  }
+
+  public void setStartDate(LocalDate startDate) {
+    this.startDate = startDate;
+  }
+
+  public LocalDate getEndDate() {
+    return endDate;
+  }
+
+  public void setEndDate(LocalDate endDate) {
+    this.endDate = endDate;
+  }
+
+  public BookingStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(BookingStatus status) {
+    this.status = status;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public void setCreatedAt(Instant createdAt) {
+    this.createdAt = createdAt;
+  }
 }

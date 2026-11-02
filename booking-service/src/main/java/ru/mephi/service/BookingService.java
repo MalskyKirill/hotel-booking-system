@@ -9,17 +9,17 @@ import ru.mephi.model.BookingStatus;
 
 @Service
 public class BookingService {
-    private final BookingPendingService pendingService;
-    private final BookingSagaCoordinator saga;
+  private final BookingPendingService pendingService;
+  private final BookingSagaCoordinator saga;
 
-    public BookingService(BookingPendingService pendingService, BookingSagaCoordinator saga) {
-        this.pendingService = pendingService;
-        this.saga = saga;
-    }
+  public BookingService(BookingPendingService pendingService, BookingSagaCoordinator saga) {
+    this.pendingService = pendingService;
+    this.saga = saga;
+  }
 
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public BookingResponse create(CreateBookingRequest request, String username) {
-        BookingResponse booking = pendingService.create(request, username);
-        return booking.status() == BookingStatus.PENDING ? saga.resume(booking.id()) : booking;
-    }
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public BookingResponse create(CreateBookingRequest request, String username) {
+    BookingResponse booking = pendingService.create(request, username);
+    return booking.status() == BookingStatus.PENDING ? saga.resume(booking.id()) : booking;
+  }
 }
