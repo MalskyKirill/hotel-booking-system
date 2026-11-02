@@ -15,6 +15,11 @@
     <dependencies>
         <dependency>
             <groupId>com.hotelbooking</groupId>
+            <artifactId>api-support</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hotelbooking</groupId>
             <artifactId>request-context</artifactId>
             <version>${project.version}</version>
         </dependency>
