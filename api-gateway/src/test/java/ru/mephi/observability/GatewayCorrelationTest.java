@@ -8,10 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.mephi.security.GatewaySecurityTestSupport;
 
 @SpringBootTest(properties = "eureka.client.enabled=false")
 @AutoConfigureMockMvc
-class GatewayCorrelationTest {
+class GatewayCorrelationTest extends GatewaySecurityTestSupport {
   @Autowired MockMvc mvc;
 
   @Test
@@ -23,7 +24,10 @@ class GatewayCorrelationTest {
 
   @Test
   void retainsCorrelationWhenDiscoveryHasNoBackend() throws Exception {
-    mvc.perform(get("/api/hotels").header(TraceContext.HEADER, "gateway-unavailable"))
+    mvc.perform(
+            get("/api/hotels")
+                .header("Authorization", "Bearer " + token("USER"))
+                .header(TraceContext.HEADER, "gateway-unavailable"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(header().string(TraceContext.HEADER, "gateway-unavailable"));
   }

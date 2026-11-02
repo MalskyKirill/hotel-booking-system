@@ -58,6 +58,25 @@ class BookingSystemIT {
   }
 
   @Test
+  void gatewayRejectsInvalidJwtAndRolesBeforeForwardingToHotel() throws Exception {
+    record Rejected(String method, String path, String token, int status, String code) {}
+    for (Rejected rejected :
+        List.of(
+            new Rejected("GET", "/api/hotels", null, 401, "UNAUTHORIZED"),
+            new Rejected("GET", "/api/hotels", "invalid", 401, "UNAUTHORIZED"),
+            new Rejected("GET", "/api/hotels", s.serviceToken, 403, "ACCESS_DENIED"),
+            new Rejected("POST", "/api/hotels", s.user, 403, "ACCESS_DENIED"))) {
+      String trace = "gateway-denied-" + UUID.randomUUID();
+      var response =
+          s.correlated(rejected.path(), rejected.method(), null, rejected.token(), trace);
+      response.error(rejected.status(), rejected.code(), rejected.path());
+      assertEquals(trace, response.traceId());
+      s.assertHttpTrace("api-gateway", trace, rejected.status());
+      assertTrue(s.proxy.observations(trace).isEmpty(), "A rejected request reached Hotel");
+    }
+  }
+
+  @Test
   void gatewayServesSwaggerUiAndBothOpenApiDocuments() throws Exception {
     for (String service : List.of("booking", "hotel")) {
       JsonNode spec = s.get("/v3/api-docs/" + service, null).require(200);
@@ -456,7 +475,17 @@ class BookingSystemIT {
     unauthorized.error(401, "UNAUTHORIZED", "/api/hotels");
     assertEquals(denied, unauthorized.traceId());
     s.assertHttpTrace("api-gateway", denied, 401);
-    s.assertHttpTrace("hotel-service", denied, 401);
+    assertTrue(s.proxy.observations(denied).isEmpty(), "Gateway forwarded an unauthorized request");
+    for (String backend : List.of("hotel", "booking")) {
+      String path = backend.equals("hotel") ? "/api/hotels" : "/api/bookings";
+      String directTrace = "direct-" + backend + "-" + UUID.randomUUID();
+      var direct = s.correlated(backend, path, "GET", null, null, directTrace);
+      direct.error(401, "UNAUTHORIZED", path);
+      assertEquals(directTrace, direct.traceId());
+      s.assertHttpTrace(backend + "-service", directTrace, 401);
+      s.call(backend, path, "GET", null, "invalid", 10).error(401, "UNAUTHORIZED", path);
+      s.call(backend, path, "GET", null, s.serviceToken, 10).error(403, "ACCESS_DENIED", path);
+    }
     String invalid = "validation-" + UUID.randomUUID();
     var request = s.booking(s.fixture(1), false);
     request.put("endDate", "2026-01-01");

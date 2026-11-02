@@ -104,6 +104,8 @@ final class LiveStack implements AutoCloseable {
                 "--spring.datasource.username=sa",
                 "--spring.datasource.password=",
                 "--spring.jpa.hibernate.ddl-auto=create-drop"));
+      if (name.equals("api-gateway"))
+        args.add("--rsa.public-key=" + keys.resolve("public.pem").toUri());
       if (name.equals("hotel-service"))
         args.add("--eureka.instance.non-secure-port=" + ports.get("proxy"));
       if (name.equals("booking-service"))
@@ -127,7 +129,9 @@ final class LiveStack implements AutoCloseable {
       checkProcesses();
       try {
         if (call("gateway", "/api/hotels", "GET", null, null, 2).status == 401
-            && call("gateway", "/api/bookings", "GET", null, null, 2).status == 401) {
+            && call("gateway", "/api/bookings", "GET", null, null, 2).status == 401
+            && call("gateway", "/v3/api-docs/booking", "GET", null, null, 2).status == 200
+            && call("gateway", "/v3/api-docs/hotel", "GET", null, null, 2).status == 200) {
           ready = true;
           break;
         }
@@ -232,6 +236,12 @@ final class LiveStack implements AutoCloseable {
   Response correlated(String path, String method, Object data, String token, String traceId)
       throws IOException, InterruptedException {
     return call("gateway", path, method, data, token, 60, traceId);
+  }
+
+  Response correlated(
+      String service, String path, String method, Object data, String token, String traceId)
+      throws IOException, InterruptedException {
+    return call(service, path, method, data, token, 60, traceId);
   }
 
   Response call(String service, String path, String method, Object data, String token, int timeout)
