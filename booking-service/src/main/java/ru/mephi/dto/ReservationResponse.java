@@ -6,5 +6,4 @@ public record ReservationResponse(
     java.time.LocalDate startDate,
     java.time.LocalDate endDate,
     ReservationStatus status // см. ниже
-) {
-}
+    ) {}

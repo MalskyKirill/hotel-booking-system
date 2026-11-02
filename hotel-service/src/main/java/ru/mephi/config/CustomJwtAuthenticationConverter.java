@@ -1,5 +1,8 @@
 package ru.mephi.config;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -7,28 +10,24 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+public class CustomJwtAuthenticationConverter
+    implements Converter<Jwt, AbstractAuthenticationToken> {
 
-public class CustomJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+  /**
+   * Белый список ролей. SERVICE — служебная роль для межсервисного взаимодействия. Она НЕ даёт прав
+   * на административные операции (hasRole("ADMIN") не сработает).
+   */
+  private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN", "SERVICE");
 
-    /**
-     * Белый список ролей.
-     * SERVICE — служебная роль для межсервисного взаимодействия.
-     * Она НЕ даёт прав на административные операции (hasRole("ADMIN") не сработает).
-     */
-    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN", "SERVICE");
+  @Override
+  public AbstractAuthenticationToken convert(Jwt jwt) {
+    String role = jwt.getClaimAsString("role");
 
-    @Override
-    public AbstractAuthenticationToken convert(Jwt jwt) {
-        String role = jwt.getClaimAsString("role");
-
-        if (role == null || !ALLOWED_ROLES.contains(role)) {
-            return new JwtAuthenticationToken(jwt, Collections.emptyList(), jwt.getSubject());
-        }
-
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-        return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
+    if (role == null || !ALLOWED_ROLES.contains(role)) {
+      return new JwtAuthenticationToken(jwt, Collections.emptyList(), jwt.getSubject());
     }
+
+    List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+    return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
+  }
 }

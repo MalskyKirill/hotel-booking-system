@@ -8,8 +8,9 @@ import org.springframework.http.HttpStatusCode;
 @Configuration
 public class GatewayConfig {
 
-    @Bean
-    public RestClientCustomizer restClientCustomizer () {
-        return restClientBuilder -> restClientBuilder.defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {});
-    }
+  @Bean
+  public RestClientCustomizer restClientCustomizer() {
+    return restClientBuilder ->
+        restClientBuilder.defaultStatusHandler(HttpStatusCode::isError, (request, response) -> {});
+  }
 }

@@ -5,56 +5,58 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "users")
 public class User {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @Column(name = "username", nullable = false, unique = true)
-    private String username;
-    @Column(name = "password", nullable = false)
-    private String password;
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private Role role;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    public User() {
-    }
+  @Column(name = "username", nullable = false, unique = true)
+  private String username;
 
-    public User(Long id, String username, String password, Role role) {
-        this.id = id;
-        this.username = username;
-        this.password = password;
-        this.role = role;
-    }
+  @Column(name = "password", nullable = false)
+  private String password;
 
-    public Long getId() {
-        return id;
-    }
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false)
+  private Role role;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public User() {}
 
-    public String getUsername() {
-        return username;
-    }
+  public User(Long id, String username, String password, Role role) {
+    this.id = id;
+    this.username = username;
+    this.password = password;
+    this.role = role;
+  }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getPassword() {
-        return password;
-    }
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+  public String getUsername() {
+    return username;
+  }
 
-    public Role getRole() {
-        return role;
-    }
+  public void setUsername(String username) {
+    this.username = username;
+  }
 
-    public void setRole(Role role) {
-        this.role = role;
-    }
+  public String getPassword() {
+    return password;
+  }
+
+  public void setPassword(String password) {
+    this.password = password;
+  }
+
+  public Role getRole() {
+    return role;
+  }
+
+  public void setRole(Role role) {
+    this.role = role;
+  }
 }

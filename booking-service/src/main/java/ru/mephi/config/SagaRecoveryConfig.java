@@ -6,5 +6,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableScheduling
-@ConditionalOnProperty(name = "booking.saga.recovery.enabled", havingValue = "true", matchIfMissing = true)
-public class SagaRecoveryConfig { }
+@ConditionalOnProperty(
+    name = "booking.saga.recovery.enabled",
+    havingValue = "true",
+    matchIfMissing = true)
+public class SagaRecoveryConfig {}

@@ -1,10 +1,9 @@
 package ru.mephi.controller;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,23 +17,23 @@ import ru.mephi.service.AuthService;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private final AuthService authService;
+  private final AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+  public AuthController(AuthService authService) {
+    this.authService = authService;
+  }
 
-    @PostMapping("/register")
-    @ApiResponse(responseCode = "201", description = "Ресурс создан")
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
-        UserResponse res = authService.register(request);
+  @PostMapping("/register")
+  @ApiResponse(responseCode = "201", description = "Ресурс создан")
+  public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
+    UserResponse res = authService.register(request);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(res);
-    }
+    return ResponseEntity.status(HttpStatus.CREATED).body(res);
+  }
 
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);   // 200 OK
-    }
+  @PostMapping("/login")
+  public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    AuthResponse response = authService.login(request);
+    return ResponseEntity.ok(response); // 200 OK
+  }
 }

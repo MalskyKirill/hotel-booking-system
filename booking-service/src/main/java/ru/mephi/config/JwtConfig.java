@@ -6,30 +6,29 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jwt.*;
 
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-
 @Configuration
 public class JwtConfig {
 
-    @Bean
-    public JwtEncoder jwtEncoder(RSAPublicKey publicKey, RSAPrivateKey privateKey) {
-        JWK jwk = new RSAKey.Builder(publicKey).privateKey(privateKey).build();
-        JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(new JWKSet(jwk));
-        return new NimbusJwtEncoder(jwkSource);
-    }
+  @Bean
+  public JwtEncoder jwtEncoder(RSAPublicKey publicKey, RSAPrivateKey privateKey) {
+    JWK jwk = new RSAKey.Builder(publicKey).privateKey(privateKey).build();
+    JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(new JWKSet(jwk));
+    return new NimbusJwtEncoder(jwkSource);
+  }
 
-    @Bean
-    public JwtDecoder jwtDecoder(RSAPublicKey publicKey) {
-        NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
+  @Bean
+  public JwtDecoder jwtDecoder(RSAPublicKey publicKey) {
+    NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
 
-        // createDefaultWithIssuer включает проверку exp, nbf и нашего iss
-        jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer("hotel-booking-system"));
+    // createDefaultWithIssuer включает проверку exp, nbf и нашего iss
+    jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer("hotel-booking-system"));
 
-        return jwtDecoder;
-    }
+    return jwtDecoder;
+  }
 }

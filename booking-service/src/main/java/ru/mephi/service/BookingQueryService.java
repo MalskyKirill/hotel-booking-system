@@ -13,21 +13,34 @@ import ru.mephi.repository.BookingRepository;
 @Service
 @Transactional(readOnly = true)
 public class BookingQueryService {
-    private final BookingRepository bookings;
-    public BookingQueryService(BookingRepository bookings) { this.bookings = bookings; }
+  private final BookingRepository bookings;
 
-    public BookingResponse get(Long id, String username) {
-        return map(bookings.findByIdAndUser_Username(id, username).orElseThrow(BookingNotFoundException::new));
+  public BookingQueryService(BookingRepository bookings) {
+    this.bookings = bookings;
+  }
+
+  public BookingResponse get(Long id, String username) {
+    return map(
+        bookings.findByIdAndUser_Username(id, username).orElseThrow(BookingNotFoundException::new));
+  }
+
+  public BookingPage history(String username, int page, int size) {
+    if (page < 0 || size < 1 || size > 100) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "page >= 0 and 1 <= size <= 100 required");
     }
-    public BookingPage history(String username, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page >= 0 and 1 <= size <= 100 required");
-        }
-        var result = bookings.findByUser_Username(username,
-            PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id")));
-        return new BookingPage(result.map(this::map).getContent(), page, size, result.getTotalElements(), result.getTotalPages());
-    }
-    private BookingResponse map(Booking booking) {
-        return BookingResponse.from(booking);
-    }
+    var result =
+        bookings.findByUser_Username(
+            username, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+    return new BookingPage(
+        result.map(this::map).getContent(),
+        page,
+        size,
+        result.getTotalElements(),
+        result.getTotalPages());
+  }
+
+  private BookingResponse map(Booking booking) {
+    return BookingResponse.from(booking);
+  }
 }

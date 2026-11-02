@@ -1,40 +1,39 @@
 package ru.mephi.dto;
 
 public class HotelResponse {
-    private Long id;
-    private String name;
-    private String address;
+  private Long id;
+  private String name;
+  private String address;
 
-    public HotelResponse() {
-    }
+  public HotelResponse() {}
 
-    public HotelResponse(Long id, String name, String address) {
-        this.id = id;
-        this.name = name;
-        this.address = address;
-    }
+  public HotelResponse(Long id, String name, String address) {
+    this.id = id;
+    this.name = name;
+    this.address = address;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+  public void setName(String name) {
+    this.name = name;
+  }
 
-    public String getAddress() {
-        return address;
-    }
+  public String getAddress() {
+    return address;
+  }
 
-    public void setAddress(String address) {
-        this.address = address;
-    }
+  public void setAddress(String address) {
+    this.address = address;
+  }
 }

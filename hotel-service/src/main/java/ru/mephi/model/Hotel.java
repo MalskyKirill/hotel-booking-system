@@ -5,39 +5,39 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "hotels")
 public class Hotel {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @Column(name = "hotel_name", nullable = false)
-    private String name;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "address", nullable = false)
-    private String address;
+  @Column(name = "hotel_name", nullable = false)
+  private String name;
 
-    public Hotel() {
-    }
+  @Column(name = "address", nullable = false)
+  private String address;
 
-    public Long getId() {
-        return id;
-    }
+  public Hotel() {}
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public String getAddress() {
-        return address;
-    }
+  public void setName(String name) {
+    this.name = name;
+  }
 
-    public void setAddress(String address) {
-        this.address = address;
-    }
+  public String getAddress() {
+    return address;
+  }
+
+  public void setAddress(String address) {
+    this.address = address;
+  }
 }
