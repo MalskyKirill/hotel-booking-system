@@ -141,7 +141,8 @@ public class HotelReservationClient {
       throw new RemoteReservationNotFoundException(request.bookingId());
     } catch (HttpClientErrorException ex) {
       throw new RemoteHotelRequestException(ex.getStatusCode().value(), errorCode(ex));
-    } catch (RestClientException ex) {
+    } catch (RestClientException | IllegalStateException ex) {
+      // Spring Cloud also throws IllegalStateException when discovery has no instance.
       throw new RemoteServiceUncertainException("Automatic selection result is uncertain", ex);
     }
     if (response == null
@@ -187,9 +188,9 @@ public class HotelReservationClient {
     } catch (HttpServerErrorException | ResourceAccessException ex) {
       log.error("Hotel service result uncertain for bookingId={}", request.bookingId());
       throw new RemoteServiceUncertainException("Hotel service result is uncertain", ex);
-    } catch (RestClientException ex) {
-      throw new RemoteServiceUncertainException(
-          "Hotel service returned an unreadable response", ex);
+    } catch (RestClientException | IllegalStateException ex) {
+      // Keep an empty discovery cache inside Saga's retry/compensation boundary.
+      throw new RemoteServiceUncertainException("Hotel service call could not be completed", ex);
     }
     validateResponse(response, request);
     if ("reserve".equals(operation) && response.status() == ReservationStatus.RELEASED) {
